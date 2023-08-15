@@ -751,17 +751,17 @@ int main(int argc, char *argv[]){
   broadcast(comm,Z_original.data(),n*3,0);
   broadcast(comm,Z_boundary_transformation.data(),b*3,0);
   broadcast(comm,T.data(),num_eles*4,0); 
+  double start,end;
   comm.barrier();
+  start = MPI_Wtime();
   
-  auto begin = chrono::high_resolution_clock::now();  
   femwarp3d(Z_original,Z_boundary_transformation,T,n,m,b,num_eles,comm,size,rank,Z_femwarp_transformed);
   comm.barrier();
+  end  = MPI_Wtime();
   
-    auto end = chrono::high_resolution_clock::now(); 
-    auto ms = std::chrono::duration_cast<std::chrono::microseconds>(end - begin);
-    cout << ms.count() << endl;
   if(rank==0){
-    //cout<<Z_femwarp_transformed<<endl;
+    //cout<<Z_femwarp_transformed<<endl; */
+    cout<<end-start<<endl;
   }
 
 
