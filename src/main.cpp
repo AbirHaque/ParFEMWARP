@@ -523,6 +523,7 @@ void femwarp3d
     boost::archive::text_iarchive archive_in(iss);
     archive_in>>master_neighbor_dict[i];      
   };
+  unordered_map<int, set<int>> AI_dict;
   unordered_map<int, set<int>> AB_dict;
   int num_vals_in_AI=0;
   int num_vals_in_AB=0;
