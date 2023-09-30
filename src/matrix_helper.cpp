@@ -123,6 +123,7 @@ int gen_neighbors_csr
   return val_count;
 }
 
+
 void csr_to_dist_csr
 (
   CSR_Matrix<double>& csr_matrix,
@@ -212,8 +213,8 @@ void parallel_csr_x_matrix
     for(int i = 0; i < N; i++){
         for(int k = csr._row_ptrs[i]; k < csr._row_ptrs[i+1]; k++){
         for(int j = 0; j<num_cols_in_matrix;j++){
-            tmp_result(j,i)+=matrix(csr._col_indices[k],j)*csr._vals[k];
-            tmp_result(j,i)+=matrix(csr._col_indices[k],j)*csr._vals[k];
+            //tmp_result(j,i)+=matrix(csr._col_indices[k],j)*csr._vals[k];
+            //tmp_result(j,i)+=matrix(csr._col_indices[k],j)*csr._vals[k];
             tmp_result(j,i)+=matrix(csr._col_indices[k],j)*csr._vals[k];
         }
         }
@@ -227,6 +228,79 @@ void parallel_csr_x_matrix
     comm.barrier();
     result.transposeInPlace();
 }
+
+void parallel_csr_x_matrix_eigen
+(
+  Eigen::SparseMatrix<double,Eigen::RowMajor> csr,
+  Eigen::MatrixXd& matrix,
+  Eigen::MatrixXd& result,
+  boost::mpi::communicator comm,
+  int rank,
+  int size,
+  int num_rows_arr[]
+)
+{
+    int N=csr.rows();
+    int num_cols_in_matrix=static_cast<int>(matrix.cols());
+    Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> tmp_result;
+    tmp_result=csr*matrix;
+    vector<int> sizes(size);
+    for(int i = 0; i < size; i++){
+        sizes[i]=num_rows_arr[i]*3;
+    }
+    comm.barrier();
+    boost::mpi::all_gatherv(comm, tmp_result.data(), result.data(),sizes);
+    comm.barrier();
+    result.transposeInPlace();
+}
+
+
+
+
+
+
+
+void parallel_csr_x_matrix_shared_mem
+(
+  CSR_Matrix<double>& csr,
+  Eigen::MatrixXd& matrix,
+  Eigen::MatrixXd& result,
+  boost::mpi::communicator comm,
+  int rank,
+  int size,
+  int num_rows_arr[],
+  int num_rows
+)
+{
+    /*TODO int N=csr._num_row_ptrs-1;
+    int num_cols_in_matrix=static_cast<int>(matrix.cols());
+    Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> tmp_result;
+    if(rank==0){
+      tmp_result.resize(3,num_rows);
+      tmp_result.setZero();
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Win tmp_result_win;
+    MPI_Win_create(tmp_result.data(), sizeof(double) * num_rows * 3, sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &tmp_result);
+    MPI_Win_fence(0, tmp_result);
+    /*need to offset.
+    for(int i = 0; i < N; i++){
+        for(int k = csr._row_ptrs[i]; k < csr._row_ptrs[i+1]; k++){
+        for(int j = 0; j<num_cols_in_matrix;j++){
+            tmp_result(j,i)+=matrix(csr._col_indices[k],j)*csr._vals[k];
+        }
+        }
+    }
+    comm.barrier();
+    vector<int> sizes(size);
+    for(int i = 0; i < size; i++){
+        sizes[i]=num_rows_arr[i]*3;
+    }
+    boost::mpi::all_gatherv(comm, tmp_result.data(), result.data(),sizes);
+    comm.barrier();
+    result.transposeInPlace();*/
+}
+
 
 void csr_x_matrix
 (
@@ -322,7 +396,6 @@ void parallel_matrix_multiplication
   int l=static_cast<int>(A.rows());
   int m=static_cast<int>(A.cols());
   int n=static_cast<int>(B.cols());
-  AxB.resize(l,n);
   AxB.setZero();
   int start = rank*(l/size);
   int end = (rank+1)*(l/size); 
@@ -352,7 +425,6 @@ void parallel_matrix_addition
 {
   int l=static_cast<int>(A.rows());
   int m=static_cast<int>(A.cols());
-  A_B.resize(l,m);
   A_B.setZero();
   int start = rank*(l/size);
   int end = (rank+1)*(l/size); 
@@ -379,7 +451,6 @@ void parallel_matrix_subtraction
 {
   int l=static_cast<int>(A.rows());
   int m=static_cast<int>(A.cols());
-  A_B.resize(l,m);
   A_B.setZero();
   int start = rank*(l/size);
   int end = (rank+1)*(l/size); 
@@ -393,6 +464,8 @@ void parallel_matrix_subtraction
   }
   MPI_Allreduce(MPI_IN_PLACE,A_B.data(),l*m,MPI_DOUBLE,MPI_SUM,comm);
 }
+
+
 void parallel_sparse_block_conjugate_gradient_v2
 (
   CSR_Matrix<double>& local_A,
@@ -436,6 +509,8 @@ void parallel_sparse_block_conjugate_gradient_v2
 
   Eigen::MatrixXd wkspc;
   wkspc.resize(X.rows(),X.cols());
+  Palpha.resize(R.rows(),3);
+  APalpha.resize(R.rows(),3);
   wkspc.setZero();
   while (Rnew.trace()>=threshold){
     AP.resize(3,num_rows_dist);//Should be (num_rows_dist,3), but mpi gets mad
@@ -455,6 +530,75 @@ void parallel_sparse_block_conjugate_gradient_v2
     parallel_matrix_addition(R,P_beta,P,comm,rank,size);
   }
 }
+
+
+/*wrong
+void parallel_sparse_block_conjugate_gradient_v2_eigen
+(
+  Eigen::SparseMatrix<double,Eigen::RowMajor> local_A,
+  Eigen::MatrixXd& global_b,
+  Eigen::MatrixXd& X,
+  boost::mpi::communicator comm,
+  int rank,
+  int size,
+  int num_rows
+)
+{
+  double threshold=1E-10;
+  Eigen::MatrixXd R;
+  Eigen::MatrixXd P;
+  Eigen::MatrixXd Rold;
+  Eigen::MatrixXd Rnew;
+  Eigen::MatrixXd PAP_inv;
+  Eigen::MatrixXd alpha;
+  Eigen::MatrixXd AP;
+  Eigen::MatrixXd PAP;
+  Eigen::MatrixXd Palpha;
+  Eigen::MatrixXd APalpha;
+  Eigen::MatrixXd beta;
+  Eigen::MatrixXd P_beta;
+
+  int num_rows_dist=0;
+  int local_num_rows=local_A.rows();
+  int num_rows_arr[size];
+  MPI_Allgather(&local_num_rows,1,MPI_INT,num_rows_arr,1,MPI_INT,comm);
+  comm.barrier();
+  num_rows_dist = accumulate(num_rows_arr, num_rows_arr+size, num_rows_dist);
+
+
+
+  R=global_b;
+  P=R;
+  parallel_ATxA(R,Rold,comm,rank,size);
+  Rnew=Rold;
+  comm.barrier();
+
+
+  Eigen::MatrixXd wkspc;
+  wkspc.resize(X.rows(),X.cols());
+  Palpha.resize(R.rows(),3);
+  APalpha.resize(R.rows(),3);
+  wkspc.setZero();
+  while (Rnew.trace()>=threshold){
+    cout<<Rnew.trace()<<" "<<threshold<<endl;
+    AP.resize(3,num_rows_dist);//Should be (num_rows_dist,3), but mpi gets mad
+    AP.setZero();
+    parallel_csr_x_matrix_eigen(local_A,P,AP,comm,rank,size,num_rows_arr);
+    parallel_ATxB(P,AP,PAP,comm,rank,size);
+    PAP_inv=PAP.inverse();
+    alpha=PAP_inv*Rold;
+    parallel_matrix_multiplication(P,alpha,Palpha,comm,rank,size);
+    parallel_matrix_addition(X,Palpha,wkspc,comm,rank,size);X=wkspc;
+    parallel_matrix_multiplication(AP,alpha,APalpha,comm,rank,size);
+    parallel_matrix_subtraction(R,APalpha,wkspc,comm,rank,size);R=wkspc;
+    parallel_ATxA(R,Rnew,comm,rank,size);
+    beta=Rold.inverse()*Rnew;
+    Rold=Rnew;
+    P_beta=P*beta;
+    parallel_matrix_addition(R,P_beta,P,comm,rank,size);
+  }
+}*/
+
 
 void sparse_block_conjugate_gradient_v2
 (

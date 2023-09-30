@@ -59,11 +59,27 @@ public:
         DataType val
     )
     {
-        for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
+        /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
             if(_col_indices[itr]==j){
                 _vals[itr]=val;
             }
-        }
+        }*/
+        int low=_row_ptrs[i];
+        int high=_row_ptrs[i+1];
+        int mid;
+        while(low<=high){
+            mid=low+(high-low)/2;
+            if(_col_indices[mid]==j){
+                _vals[mid]=val;
+                break;
+            }
+            else if(_col_indices[mid]<j){
+                low=mid+1;
+            }
+            else{
+                high=mid-1;
+            }
+        }        
     }
     double getValAt
     (
@@ -71,9 +87,24 @@ public:
         int j
     )
     {
-        for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
+        /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
             if(_col_indices[itr]==j){
                 return _vals[itr];
+            }
+        }*/
+        int low=_row_ptrs[i];
+        int high=_row_ptrs[i+1];
+        int mid;
+        while(low<=high){
+            mid=low+(high-low)/2;
+            if(_col_indices[mid]==j){
+                return _vals[mid];
+            }
+            else if(_col_indices[mid]<j){
+                low=mid+1;
+            }
+            else{
+                high=mid-1;
             }
         }
         return 0;
@@ -85,10 +116,26 @@ public:
         DataType val
     )
     {
-        for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
+        /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
             if(_col_indices[itr]==j){
                 _vals[itr]-=val;
                 break;
+            }
+        }*/
+        int low=_row_ptrs[i];
+        int high=_row_ptrs[i+1];
+        int mid;
+        while(low<=high){
+            mid=low+(high-low)/2;
+            if(_col_indices[mid]==j){
+                _vals[mid]-=val;
+                break;
+            }
+            else if(_col_indices[mid]<j){
+                low=mid+1;
+            }
+            else{
+                high=mid-1;
             }
         }
     }
@@ -99,10 +146,27 @@ public:
         DataType val
     )
     {
-        for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
+        /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
             if(_col_indices[itr]==j){
                 _vals[itr]+=val;
                 break;
+            }
+        }*/
+        
+        int low=_row_ptrs[i];
+        int high=_row_ptrs[i+1];
+        int mid;
+        while(low<=high){
+            mid=low+(high-low)/2;
+            if(_col_indices[mid]==j){
+                _vals[mid]+=val;
+                break;
+            }
+            else if(_col_indices[mid]<j){
+                low=mid+1;
+            }
+            else{
+                high=mid-1;
             }
         }
     }
