@@ -95,17 +95,6 @@ void parallel_csr_x_matrix_shared_mem
   int num_rows
 );
 
-void parallel_csr_x_matrix_eigen
-(
-  Eigen::SparseMatrix<double,Eigen::RowMajor> csr,
-  Eigen::MatrixXd& matrix,
-  Eigen::MatrixXd& result,
-  boost::mpi::communicator comm,
-  int rank,
-  int size,
-  int num_rows_arr[]
-);
-
 void csr_x_matrix
 (
   CSR_Matrix<double>& csr,
@@ -167,6 +156,19 @@ void parallel_sparse_block_conjugate_gradient_v2
   CSR_Matrix<double>& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
+  boost::mpi::communicator comm,
+  int rank,
+  int size,
+  int num_rows
+);
+
+void parallel_preconditioned_sparse_block_conjugate_gradient_v2_icf
+(
+  CSR_Matrix<double>& local_A,
+  Eigen::MatrixXd& global_b,
+  Eigen::MatrixXd& X,
+  Eigen::MatrixXd& L_inv,
+  Eigen::MatrixXd& L_inv_transpose,
   boost::mpi::communicator comm,
   int rank,
   int size,

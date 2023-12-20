@@ -193,6 +193,7 @@ void csr_to_dist_csr
   }
 }
 
+
 void parallel_csr_x_matrix
 (
   CSR_Matrix<double>& csr,
@@ -213,8 +214,6 @@ void parallel_csr_x_matrix
     for(int i = 0; i < N; i++){
         for(int k = csr._row_ptrs[i]; k < csr._row_ptrs[i+1]; k++){
         for(int j = 0; j<num_cols_in_matrix;j++){
-            //tmp_result(j,i)+=matrix(csr._col_indices[k],j)*csr._vals[k];
-            //tmp_result(j,i)+=matrix(csr._col_indices[k],j)*csr._vals[k];
             tmp_result(j,i)+=matrix(csr._col_indices[k],j)*csr._vals[k];
         }
         }
@@ -228,32 +227,6 @@ void parallel_csr_x_matrix
     comm.barrier();
     result.transposeInPlace();
 }
-
-void parallel_csr_x_matrix_eigen
-(
-  Eigen::SparseMatrix<double,Eigen::RowMajor> csr,
-  Eigen::MatrixXd& matrix,
-  Eigen::MatrixXd& result,
-  boost::mpi::communicator comm,
-  int rank,
-  int size,
-  int num_rows_arr[]
-)
-{
-    int N=csr.rows();
-    int num_cols_in_matrix=static_cast<int>(matrix.cols());
-    Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> tmp_result;
-    tmp_result=csr*matrix;
-    vector<int> sizes(size);
-    for(int i = 0; i < size; i++){
-        sizes[i]=num_rows_arr[i]*3;
-    }
-    comm.barrier();
-    boost::mpi::all_gatherv(comm, tmp_result.data(), result.data(),sizes);
-    comm.barrier();
-    result.transposeInPlace();
-}
-
 
 
 
@@ -512,6 +485,7 @@ void parallel_sparse_block_conjugate_gradient_v2
   Palpha.resize(R.rows(),3);
   APalpha.resize(R.rows(),3);
   wkspc.setZero();
+  int i = 0;
   while (Rnew.trace()>=threshold){
     AP.resize(3,num_rows_dist);//Should be (num_rows_dist,3), but mpi gets mad
     AP.setZero();
@@ -528,16 +502,20 @@ void parallel_sparse_block_conjugate_gradient_v2
     Rold=Rnew;
     P_beta=P*beta;
     parallel_matrix_addition(R,P_beta,P,comm,rank,size);
+    i++;
   }
+  //cout<<i<<endl;
 }
 
 
-/*wrong
-void parallel_sparse_block_conjugate_gradient_v2_eigen
+
+void parallel_preconditioned_sparse_block_conjugate_gradient_v2_icf
 (
-  Eigen::SparseMatrix<double,Eigen::RowMajor> local_A,
+  CSR_Matrix<double>& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
+  Eigen::MatrixXd& L_inv,
+  Eigen::MatrixXd& L_inv_transpose,
   boost::mpi::communicator comm,
   int rank,
   int size,
@@ -547,6 +525,7 @@ void parallel_sparse_block_conjugate_gradient_v2_eigen
   double threshold=1E-10;
   Eigen::MatrixXd R;
   Eigen::MatrixXd P;
+  Eigen::MatrixXd Z;
   Eigen::MatrixXd Rold;
   Eigen::MatrixXd Rnew;
   Eigen::MatrixXd PAP_inv;
@@ -559,16 +538,16 @@ void parallel_sparse_block_conjugate_gradient_v2_eigen
   Eigen::MatrixXd P_beta;
 
   int num_rows_dist=0;
-  int local_num_rows=local_A.rows();
+  int local_num_rows=local_A._num_row_ptrs-1;
   int num_rows_arr[size];
   MPI_Allgather(&local_num_rows,1,MPI_INT,num_rows_arr,1,MPI_INT,comm);
   comm.barrier();
   num_rows_dist = accumulate(num_rows_arr, num_rows_arr+size, num_rows_dist);
 
 
-
-  R=global_b;
-  P=R;
+  R=global_b;//No initial guess.
+  Z=L_inv_transpose*(L_inv*R);
+  P=/*R;*/Z;
   parallel_ATxA(R,Rold,comm,rank,size);
   Rnew=Rold;
   comm.barrier();
@@ -579,11 +558,12 @@ void parallel_sparse_block_conjugate_gradient_v2_eigen
   Palpha.resize(R.rows(),3);
   APalpha.resize(R.rows(),3);
   wkspc.setZero();
-  while (Rnew.trace()>=threshold){
-    cout<<Rnew.trace()<<" "<<threshold<<endl;
+  int i = 0;
+  while(Rnew.trace()>=threshold){
     AP.resize(3,num_rows_dist);//Should be (num_rows_dist,3), but mpi gets mad
     AP.setZero();
-    parallel_csr_x_matrix_eigen(local_A,P,AP,comm,rank,size,num_rows_arr);
+    parallel_ATxB(R,Z,Rold,comm,rank,size);
+    parallel_csr_x_matrix(local_A,P,AP,comm,rank,size,num_rows_arr);
     parallel_ATxB(P,AP,PAP,comm,rank,size);
     PAP_inv=PAP.inverse();
     alpha=PAP_inv*Rold;
@@ -591,13 +571,19 @@ void parallel_sparse_block_conjugate_gradient_v2_eigen
     parallel_matrix_addition(X,Palpha,wkspc,comm,rank,size);X=wkspc;
     parallel_matrix_multiplication(AP,alpha,APalpha,comm,rank,size);
     parallel_matrix_subtraction(R,APalpha,wkspc,comm,rank,size);R=wkspc;
-    parallel_ATxA(R,Rnew,comm,rank,size);
+    Z=L_inv_transpose*(L_inv*R);
+    /*parallel_ATxA(R,Rnew,comm,rank,size);*/parallel_ATxB(R,Z,Rnew,comm,rank,size);
     beta=Rold.inverse()*Rnew;
     Rold=Rnew;
     P_beta=P*beta;
-    parallel_matrix_addition(R,P_beta,P,comm,rank,size);
+    parallel_matrix_addition(Z/*R*/,P_beta,P,comm,rank,size);
+    i++;
   }
-}*/
+  cout<<i<<endl;
+
+}
+
+
 
 
 void sparse_block_conjugate_gradient_v2
@@ -645,3 +631,4 @@ void sparse_block_conjugate_gradient_v2
     P=R+P_beta;
   }
 }
+

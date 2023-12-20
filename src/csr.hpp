@@ -1,3 +1,4 @@
+#include <math.h>
 template <class DataType>
 class CSR_Matrix
 {
@@ -5,7 +6,7 @@ public:
     int _num_vals;
     int _num_col_indices;
     int _num_row_ptrs;
-    DataType* _vals;
+    /*DataType**/double* _vals;
     int* _col_indices;
     int* _row_ptrs;
     CSR_Matrix
@@ -24,10 +25,14 @@ public:
             _row_ptrs=nullptr;
         }
         else{
-            _vals=new DataType[num_vals];
+            _vals=(double*) calloc(num_vals, sizeof(double));//new DataType[num_vals];
             _col_indices=new int[num_col_indices];
             _row_ptrs=new int[num_row_ptrs];
-            memset(_vals, 0, sizeof(_vals));
+            if(_row_ptrs==NULL){
+                std::cout<<"_row_ptrs=NULL"<<std::endl;
+                //exit(-1);
+            }
+            //memset(_vals, 0, sizeof(_vals));
         }
     }
     ~CSR_Matrix()
@@ -42,7 +47,13 @@ public:
         int val
     )
     {
-        _row_ptrs[i]=val;
+        if(i<_num_row_ptrs){
+            _row_ptrs[i]=val;
+        }
+        else{
+            std::cout<<"Error: "<<i<<" >= "<<_num_row_ptrs<<"!"<<std::endl;
+            //exit(_num_row_ptrs);
+        }
     }
     void setColIndicesAt
     (
@@ -50,13 +61,19 @@ public:
         int val
     )
     {
-        _col_indices[i]=val;
+        if(i<_num_col_indices){
+            _col_indices[i]=val;
+        }
+        else{
+            std::cout<<"Error: "<<i<<" >= "<<_num_col_indices<<"!"<<std::endl;
+            //exit(_num_row_ptrs);
+        }
     }
     void setValAt
     (
         int i,
         int j,
-        DataType val
+        /*DataType*/double val
     )
     {
         /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
@@ -113,7 +130,7 @@ public:
     (
         int i,
         int j,
-        DataType val
+        /*DataType*/double val
     )
     {
         /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
@@ -143,7 +160,7 @@ public:
     (
         int i,
         int j,
-        DataType val
+        /*DataType*/double val
     )
     {
         /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
@@ -169,6 +186,60 @@ public:
                 high=mid-1;
             }
         }
+    }
+    void divideValAt
+    (
+        int i,
+        int j,
+        /*DataType*/double val
+    )
+    {
+        /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
+            if(_col_indices[itr]==j){
+                _vals[itr]+=val;
+                break;
+            }
+        }*/
+        
+        int low=_row_ptrs[i];
+        int high=_row_ptrs[i+1];
+        int mid;
+        while(low<=high){
+            mid=low+(high-low)/2;
+            if(_col_indices[mid]==j){
+                _vals[mid]/=val;
+                break;
+            }
+            else if(_col_indices[mid]<j){
+                low=mid+1;
+            }
+            else{
+                high=mid-1;
+            }
+        }
+    }
+    void sqrtValAt
+    (
+        int i,
+        int j
+    )
+    {
+        int low=_row_ptrs[i];
+        int high=_row_ptrs[i+1];
+        int mid;
+        while(low<=high){
+            mid=low+(high-low)/2;
+            if(_col_indices[mid]==j){
+                _vals[mid]=sqrt(_vals[mid]);
+                break;
+            }
+            else if(_col_indices[mid]<j){
+                low=mid+1;
+            }
+            else{
+                high=mid-1;
+            }
+        }        
     }
     void printMatrix(){
         std::cout<<"row_ptrs:";
@@ -200,7 +271,7 @@ public:
     void printVals(){
         std::cout<<"vals:";
         for(int i = 0; i < _num_vals; i++){
-           std:: cout<<_vals[i]<<" ";
+           std::cout<<_vals[i]<<" ";
         }std::cout<<std::endl;
     }
 };
