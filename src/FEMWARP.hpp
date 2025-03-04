@@ -29,18 +29,6 @@
 
 using namespace std;
 
-void distributed_femwarp3d_costly
-(
-  Eigen::MatrixXd& Z_original,
-  Eigen::MatrixXd& xy_prime,
-  Eigen::MatrixXi& T,
-  int n,int m,int b,int num_eles,
-  boost::mpi::communicator comm,
-  int size,
-  int rank,
-  Eigen::MatrixXd& Z_femwarp_transformed
-);
-
 void distributed_femwarp3d_RMA
 (
   Eigen::MatrixXd& Z_original,
@@ -65,7 +53,7 @@ void distributed_femwarp3d_SHM_RMA
   Eigen::MatrixXd& Z_femwarp_transformed
 );
 
-void serial_femwarp3d_costly
+void serial_femwarp3d
 (
   Eigen::MatrixXd& Z_original,
   Eigen::MatrixXd& xy_prime,
@@ -74,11 +62,23 @@ void serial_femwarp3d_costly
   Eigen::MatrixXd& Z_femwarp_transformed
 );
 
-void serial_femwarp3d_no_precompute_eigen_costly
+void serial_multistep_femwarp3d
 (
   Eigen::MatrixXd& Z_original,
-  Eigen::MatrixXd& xy_prime,
+  void (*deformation_functions[])(Eigen::MatrixXd&),int num_deformations,
+  Eigen::MatrixXi& T,
+  int n,int m,int b,int num_eles, 
+  Eigen::MatrixXd& Z_femwarp_transformed
+);
+
+void distributed_multistep_femwarp3d_SHM_RMA //works
+(
+  Eigen::MatrixXd& Z_original,
+  void (*deformation_functions[])(Eigen::MatrixXd&),int num_deformations,
   Eigen::MatrixXi& T,
   int n,int m,int b,int num_eles,
+  boost::mpi::communicator comm,
+  int size,
+  int rank,
   Eigen::MatrixXd& Z_femwarp_transformed
 );

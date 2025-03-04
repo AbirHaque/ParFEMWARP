@@ -1,12 +1,15 @@
 #include <math.h>
-template <class DataType>
 class CSR_Matrix
 {
+private:
+    int _tryLastPos_i;
+    int _tryLastPos_j;
+    int _tryLastPos_mid;
 public:
     int _num_vals;
     int _num_col_indices;
     int _num_row_ptrs;
-    /*DataType**/double* _vals;
+    double* _vals;
     int* _col_indices;
     int* _row_ptrs;
     CSR_Matrix
@@ -25,14 +28,12 @@ public:
             _row_ptrs=nullptr;
         }
         else{
-            _vals=(double*) calloc(num_vals, sizeof(double));//new DataType[num_vals];
+            _vals=(double*) calloc(num_vals, sizeof(double));
             _col_indices=new int[num_col_indices];
             _row_ptrs=new int[num_row_ptrs];
             if(_row_ptrs==NULL){
                 std::cout<<"_row_ptrs=NULL"<<std::endl;
-                //exit(-1);
             }
-            //memset(_vals, 0, sizeof(_vals));
         }
     }
     ~CSR_Matrix()
@@ -40,6 +41,21 @@ public:
         delete _vals;
         delete _col_indices;
         delete _row_ptrs;
+    }
+    int getValIndexAt
+    (
+        int i,
+        int j
+    )
+    {
+        int low=_row_ptrs[i];
+        int high=_row_ptrs[i+1];
+        int mid=std::lower_bound(_col_indices+low,_col_indices+high,j)-_col_indices;
+        if(mid!=high&&mid<_num_col_indices&&_col_indices[mid]==j){
+            setTryLastPos(i,j,mid);
+            return mid;
+        }
+        return -1;
     }
     void setRowPtrsAt
     (
@@ -52,7 +68,6 @@ public:
         }
         else{
             std::cout<<"Error: "<<i<<" >= "<<_num_row_ptrs<<"!"<<std::endl;
-            //exit(_num_row_ptrs);
         }
     }
     void setColIndicesAt
@@ -66,37 +81,43 @@ public:
         }
         else{
             std::cout<<"Error: "<<i<<" >= "<<_num_col_indices<<"!"<<std::endl;
-            //exit(_num_row_ptrs);
         }
+    }
+    void setTryLastPos
+    (
+        int i,
+        int j,
+        int mid
+    )
+    {
+        _tryLastPos_i=i;
+        _tryLastPos_j=j;
+        _tryLastPos_mid=mid;
+    }
+    void resetTryLastPos
+    (
+        void
+    )
+    {
+        _tryLastPos_i=-1;
+        _tryLastPos_j=-1;
+        _tryLastPos_mid=-1;
     }
     void setValAt
     (
         int i,
         int j,
-        /*DataType*/double val
+        double val
     )
     {
-        /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
-            if(_col_indices[itr]==j){
-                _vals[itr]=val;
-            }
-        }*/
         int low=_row_ptrs[i];
         int high=_row_ptrs[i+1];
-        int mid;
-        while(low<=high){
-            mid=low+(high-low)/2;
-            if(_col_indices[mid]==j){
-                _vals[mid]=val;
-                break;
-            }
-            else if(_col_indices[mid]<j){
-                low=mid+1;
-            }
-            else{
-                high=mid-1;
-            }
-        }        
+        int mid=std::lower_bound(_col_indices+low,_col_indices+high,j)-_col_indices;
+        if(mid!=high&&mid<_num_col_indices&&_col_indices[mid]==j){
+            setTryLastPos(i,j,mid);
+            _vals[mid]=val;
+            return;
+        }
     }
     double getValAt
     (
@@ -104,25 +125,12 @@ public:
         int j
     )
     {
-        /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
-            if(_col_indices[itr]==j){
-                return _vals[itr];
-            }
-        }*/
         int low=_row_ptrs[i];
         int high=_row_ptrs[i+1];
-        int mid;
-        while(low<=high){
-            mid=low+(high-low)/2;
-            if(_col_indices[mid]==j){
-                return _vals[mid];
-            }
-            else if(_col_indices[mid]<j){
-                low=mid+1;
-            }
-            else{
-                high=mid-1;
-            }
+        int mid=std::lower_bound(_col_indices+low,_col_indices+high,j)-_col_indices;
+        if(mid!=high&&mid<_num_col_indices&&_col_indices[mid]==j){
+            setTryLastPos(i,j,mid);
+            return _vals[mid];
         }
         return 0;
     }
@@ -130,92 +138,47 @@ public:
     (
         int i,
         int j,
-        /*DataType*/double val
+        double val
     )
     {
-        /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
-            if(_col_indices[itr]==j){
-                _vals[itr]-=val;
-                break;
-            }
-        }*/
         int low=_row_ptrs[i];
         int high=_row_ptrs[i+1];
-        int mid;
-        while(low<=high){
-            mid=low+(high-low)/2;
-            if(_col_indices[mid]==j){
-                _vals[mid]-=val;
-                break;
-            }
-            else if(_col_indices[mid]<j){
-                low=mid+1;
-            }
-            else{
-                high=mid-1;
-            }
+        int mid=std::lower_bound(_col_indices+low,_col_indices+high,j)-_col_indices;
+        if(mid!=high&&mid<_num_col_indices&&_col_indices[mid]==j){
+            setTryLastPos(i,j,mid);
+            _vals[mid]-=val;
         }
     }
     void addValAt
     (
         int i,
         int j,
-        /*DataType*/double val
+        double val
     )
     {
-        /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
-            if(_col_indices[itr]==j){
-                _vals[itr]+=val;
-                break;
-            }
-        }*/
         
         int low=_row_ptrs[i];
         int high=_row_ptrs[i+1];
-        int mid;
-        while(low<=high){
-            mid=low+(high-low)/2;
-            if(_col_indices[mid]==j){
-                _vals[mid]+=val;
-                break;
-            }
-            else if(_col_indices[mid]<j){
-                low=mid+1;
-            }
-            else{
-                high=mid-1;
-            }
+        int mid=std::lower_bound(_col_indices+low,_col_indices+high,j)-_col_indices;
+        if(mid!=high&&mid<_num_col_indices&&_col_indices[mid]==j){
+            setTryLastPos(i,j,mid);
+            _vals[mid]+=val;
         }
     }
     void divideValAt
     (
         int i,
         int j,
-        /*DataType*/double val
+        double val
     )
     {
-        /*for(int itr = _row_ptrs[i]; itr<_row_ptrs[i+1];itr++){
-            if(_col_indices[itr]==j){
-                _vals[itr]+=val;
-                break;
-            }
-        }*/
         
         int low=_row_ptrs[i];
         int high=_row_ptrs[i+1];
-        int mid;
-        while(low<=high){
-            mid=low+(high-low)/2;
-            if(_col_indices[mid]==j){
-                _vals[mid]/=val;
-                break;
-            }
-            else if(_col_indices[mid]<j){
-                low=mid+1;
-            }
-            else{
-                high=mid-1;
-            }
+        int mid=std::lower_bound(_col_indices+low,_col_indices+high,j)-_col_indices;
+        if(mid!=high&&mid<_num_col_indices&&_col_indices[mid]==j){
+            setTryLastPos(i,j,mid);
+            _vals[mid]/=val;
         }
     }
     void sqrtValAt
@@ -226,20 +189,11 @@ public:
     {
         int low=_row_ptrs[i];
         int high=_row_ptrs[i+1];
-        int mid;
-        while(low<=high){
-            mid=low+(high-low)/2;
-            if(_col_indices[mid]==j){
-                _vals[mid]=sqrt(_vals[mid]);
-                break;
-            }
-            else if(_col_indices[mid]<j){
-                low=mid+1;
-            }
-            else{
-                high=mid-1;
-            }
-        }        
+        int mid=std::lower_bound(_col_indices+low,_col_indices+high,j)-_col_indices;
+        if(mid!=high&&mid<_num_col_indices&&_col_indices[mid]==j){
+            setTryLastPos(i,j,mid);
+            _vals[mid]=sqrt(_vals[mid]);
+        }
     }
     void printMatrix(){
         std::cout<<"row_ptrs:";
@@ -275,3 +229,4 @@ public:
         }std::cout<<std::endl;
     }
 };
+
