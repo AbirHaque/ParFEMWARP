@@ -54,9 +54,6 @@ Notes:
 #include <list>
 #include <queue>
 #include <numeric>
-//#include <boost/mpi/collectives/all_gather.hpp>
-//#include <boost/mpi/collectives/all_gatherv.hpp>
-//#include <boost/mpi.hpp>
 #include <Eigen/Eigen>
 #include <Eigen/Core>
 
@@ -102,7 +99,6 @@ void csr_to_dist_csr
   CSR_Matrix& dist_csr_matrix_part,
   int rows,
   MPI_Comm comm,
-  //boost::mpi::communicator& comm,
   int size,
   int rank
 );
@@ -113,7 +109,6 @@ void parallel_csr_x_matrix
   Eigen::MatrixXd& matrix,
   Eigen::MatrixXd& result,
   MPI_Comm comm,
-  //boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr
@@ -126,37 +121,11 @@ void parallel_csr_x_matrix_optimized
   Eigen::MatrixXd& result,
   Eigen::MatrixXd& tmp_result,
   MPI_Comm comm,
-  //boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr
 );
 
-/*void parallel_block_diag_matrix_x_matrix
-(
-  Eigen::MatrixXd& local_A,
-  Eigen::MatrixXd& B,
-  Eigen::MatrixXd& result,
-  MPI_Comm comm,
-  //boost::mpi::communicator& comm,
-  int rank,
-  int size,
-  int* num_rows_arr,
-  int upto_num_rows_dist
-);
-
-void parallel_block_diag_matrices_x_matrix
-(
-  vector<Eigen::MatrixXd>& local_A,
-  Eigen::MatrixXd& B,
-  Eigen::MatrixXd& result,
-  MPI_Comm comm,
-  //boost::mpi::communicator& comm,
-  int rank,
-  int size,
-  int* num_rows_arr,
-  int* starting_indices
-);*/
 
 void parallel_diag_matrix_x_matrix
 (
@@ -164,7 +133,6 @@ void parallel_diag_matrix_x_matrix
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& result,
   MPI_Comm comm,
-  //boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr,
@@ -183,7 +151,6 @@ void parallel_ATxA
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& ATxA,
   MPI_Comm comm,
-  //boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -194,7 +161,6 @@ void parallel_ATxB
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& ATxB,
   MPI_Comm comm,
-  //boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -207,7 +173,6 @@ void parallel_ATxB_CTxD
   Eigen::MatrixXd& D,
   Eigen::MatrixXd& ATxB_CTxD,
   MPI_Comm comm,
-  //boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -218,7 +183,6 @@ void parallel_matrix_multiplication
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& AxB,
   MPI_Comm comm,
-  //boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -229,7 +193,6 @@ void parallel_matrix_addition
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& A_B,
   MPI_Comm comm,
-  //boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -239,7 +202,7 @@ void parallel_matrix_subtraction
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& A_B,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 );
@@ -250,7 +213,7 @@ void parallel_C_add_AB
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& C_add_AB,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 );
@@ -261,7 +224,7 @@ void parallel_C_sub_AB
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& C_sub_AB,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 );
@@ -275,7 +238,7 @@ void parallel_C_add_AB_F_sub_DE
   Eigen::MatrixXd& E,
   Eigen::MatrixXd& F,
   Eigen::MatrixXd& C_add_AB_F_sub_DE,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 );
@@ -285,7 +248,7 @@ void parallel_sparse_block_conjugate_gradient_v2
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size,
   int num_rows
@@ -296,7 +259,7 @@ void parallel_sparse_block_conjugate_gradient_v3
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size,
   int num_rows,
@@ -308,7 +271,7 @@ void parallel_sparse_block_conjugate_gradient_v4
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size,
   int num_rows,

@@ -54,15 +54,6 @@ Notes:
 #include <list>
 #include <queue>
 #include <numeric>
-/*#include <boost/serialization/vector.hpp>
-#include <boost/serialization/unordered_map.hpp>
-#include <boost/serialization/set.hpp>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/serialization/string.hpp>
-#include <boost/mpi/collectives/all_gather.hpp>
-#include <boost/mpi/collectives/all_gatherv.hpp>
-#include <boost/mpi.hpp>*/
 #include <Eigen/Eigen>
 #include <Eigen/Core>
 
@@ -76,7 +67,6 @@ void distributed_femwarp3d_RMA
   Eigen::MatrixXi& T,
   int n,int m,int b,int num_eles,
   MPI_Comm comm,
-  //boost::mpi::communicator comm,
   int size,
   int rank,
   Eigen::MatrixXd& Z_femwarp_transformed
@@ -89,7 +79,6 @@ void distributed_femwarp3d_SHM_RMA
   Eigen::MatrixXi& T,
   int n,int m,int b,int num_eles,
   MPI_Comm comm,
-  //boost::mpi::communicator comm,
   int size,
   int rank,
   Eigen::MatrixXd& Z_femwarp_transformed
@@ -120,7 +109,6 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   Eigen::MatrixXi& T,
   int n,int m,int b,int num_eles,
   MPI_Comm comm,
-  //boost::mpi::communicator comm,
   int size,
   int rank,
   Eigen::MatrixXd& Z_femwarp_transformed

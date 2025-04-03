@@ -56,15 +56,6 @@ Notes:
 #include <list>
 #include <queue>
 #include <numeric>
-/*#include <boost/serialization/vector.hpp>
-//#include <boost/serialization/unordered_map.hpp>
-//#include <boost/serialization/set.hpp>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/serialization/string.hpp>
-//#include <boost/mpi/collectives/all_gather.hpp>
-//#include <boost/mpi/collectives/all_gatherv.hpp>
-#include <boost/mpi.hpp>*/
 #include <Eigen/Eigen>
 #include <Eigen/Sparse>
 #include <Eigen/Core>
@@ -172,7 +163,7 @@ void csr_to_dist_csr
   CSR_Matrix& csr_matrix,
   CSR_Matrix& dist_csr_matrix_part,
   int rows,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int size,
   int rank
 )
@@ -184,41 +175,6 @@ void csr_to_dist_csr
   }
   vtxdist[size]=rows;
   MPI_Barrier(comm);
-  /*vector<vector<int>> local_row_ptrs;
-  vector<vector<int>> local_col_inds;
-  vector<vector<double>> local_datas;
-  if (rank==0){
-    int col_offset=0;
-    for(int i = 0; i < size;i++){
-      int start_offset=vtxdist[i];
-      int end_offset=vtxdist[i+1]+1;
-      vector<int> tmp1(end_offset-start_offset);
-      for(int j = start_offset; j < end_offset; j++){
-        tmp1[j-start_offset]=csr_matrix._row_ptrs[j]-csr_matrix._row_ptrs[start_offset];
-      }
-      local_row_ptrs.push_back(tmp1);
-      int tmp23_size=local_row_ptrs[i].back()-local_row_ptrs[i][0];
-      vector<int> tmp2(tmp23_size);
-      vector<double> tmp3(tmp23_size);
-      for(int j = local_row_ptrs[i][0]; j < local_row_ptrs[i].back(); j++){
-        tmp2[j]=csr_matrix._col_indices[j+col_offset];
-        tmp3[j]=csr_matrix._vals[j+col_offset];
-      }
-      local_col_inds.push_back(tmp2);
-      local_datas.push_back(tmp3);
-      col_offset+=local_row_ptrs.back().back();
-    }
-  }
-  MPI_Barrier(comm);
-  vector<int> local_row_ptr;
-  vector<int> local_col_ind;
-  vector<double> local_data;
-  boost::mpi::communicator b_comm;
-  boost::mpi::scatter(b_comm,local_row_ptrs,local_row_ptr,0);
-  boost::mpi::scatter(b_comm,local_col_inds,local_col_ind,0);
-  boost::mpi::scatter(b_comm,local_datas,local_data,0);*/
-
-
   vector<vector<int>> local_row_ptrs;
   vector<vector<int>> local_col_inds;
   vector<vector<double>> local_datas;
@@ -304,11 +260,6 @@ void csr_to_dist_csr
     free(local_col_ind_buf);
     free(local_data_buf);
   }
-  /*boost::mpi::communicator b_comm;
-  boost::mpi::scatter(b_comm,local_row_ptrs,local_row_ptr,0);
-  boost::mpi::scatter(b_comm,local_col_inds,local_col_ind,0);
-  boost::mpi::scatter(b_comm,local_datas,local_data,0);*/
-
 
 
 
@@ -335,7 +286,7 @@ void parallel_csr_x_matrix
   CSR_Matrix& csr,
   Eigen::MatrixXd& matrix,
   Eigen::MatrixXd& result,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size,
   int* num_rows_arr
@@ -380,7 +331,7 @@ void parallel_csr_x_matrix_optimized
   Eigen::MatrixXd& matrix,
   Eigen::MatrixXd& result,
   Eigen::MatrixXd& tmp_result,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size,
   int* num_rows_arr
@@ -415,95 +366,6 @@ void parallel_csr_x_matrix_optimized
 }
 
 
-/*void parallel_block_diag_matrix_x_matrix
-(
-  Eigen::MatrixXd& local_A,
-  Eigen::MatrixXd& B,
-  Eigen::MatrixXd& result,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
-  int rank,
-  int size,
-  int* num_rows_arr,
-  int upto_num_rows_dist
-)
-{
-    int N=static_cast<int>(local_A.rows());
-    int num_cols_in_B=static_cast<int>(B.cols());
-    Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> tmp_result;
-    tmp_result.resize(num_cols_in_B,N);
-    tmp_result.setZero();
-
-
-    // somthing isnt right here. Basically need to do a local_A*B, but "zeros" in local_A result in that part of multiplication to be 0. B.block<local_A.rows(),local_A.rows()>(upto_num_rows_dist,0);
-    for(int i = 0; i < N; i++){
-      for(int k = upto_num_rows_dist; k < upto_num_rows_dist+N;k++){
-        for(int j = 0; j < num_cols_in_B; j++){
-          tmp_result(j,i)+=local_A(i,k-upto_num_rows_dist)*B(k,j);
-        }
-      }
-    }
-    ////
-    MPI_Barrier(comm);
-    vector<int> sizes(size);
-    for(int i = 0; i < size; i++){
-        sizes[i]=num_rows_arr[i]*num_cols_in_B;
-    }
-    boost::mpi::all_gatherv(comm, tmp_result.data(), result.data(),sizes);
-    MPI_Barrier(comm);
-    result.transposeInPlace();
-}
-
-
-
-
-void parallel_block_diag_matrices_x_matrix
-(
-  vector<Eigen::MatrixXd>& local_A,
-  Eigen::MatrixXd& B,
-  Eigen::MatrixXd& result,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
-  int rank,
-  int size,
-  int* num_rows_arr,
-  int upto_num_rows_dist,
-  int* starting_indices
-)
-{
-    double start = MPI_Wtime();
-    double end;
-    int num_blocks=local_A.size();
-    int N=starting_indices[num_blocks];
-    //cout<<N<<endl;
-    int num_cols_in_B=static_cast<int>(B.cols());
-    Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> tmp_result;
-    tmp_result.resize(num_cols_in_B,N);
-    tmp_result.setZero();
-
-    for(int b = 0; b < num_blocks; b++){
-      for(int i = starting_indices[b]; i < starting_indices[b+1]; i++){
-        for(int k = upto_num_rows_dist+starting_indices[b]; k < upto_num_rows_dist+starting_indices[b+1];k++){
-          for(int j = 0; j < num_cols_in_B; j++){
-            tmp_result(j,i)+=local_A[b](i-starting_indices[b],k-starting_indices[b]-upto_num_rows_dist)*B(k,j);
-          }
-        }
-      }
-    }
-
-    ////
-    MPI_Barrier(comm);
-    vector<int> sizes(size);
-    for(int i = 0; i < size; i++){
-        sizes[i]=num_rows_arr[i]*num_cols_in_B;
-    }
-    boost::mpi::all_gatherv(comm, tmp_result.data(), result.data(),sizes);
-    MPI_Barrier(comm);
-    end = MPI_Wtime();
-    if(rank==0)cout<<"\t\t\tparallel_block_diag_matrices_x_matrix time: "<<end-start<<endl;
-    result.transposeInPlace();
-}*/
-
-
-
 
 void diag_matrix_x_matrix
 (
@@ -532,7 +394,7 @@ void parallel_diag_matrix_x_matrix
   CSR_Matrix& csr,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& result,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size,
   int* num_rows_arr,
@@ -591,7 +453,7 @@ void parallel_ATxA
 (
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& ATxA,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 )
@@ -615,7 +477,7 @@ void parallel_ATxB
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& ATxB,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 )
@@ -641,7 +503,7 @@ void parallel_ATxB_CTxD
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& D,
   Eigen::MatrixXd& ATxB_CTxD,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 )
@@ -666,7 +528,7 @@ void parallel_matrix_multiplication
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& AxB,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 )
@@ -689,7 +551,7 @@ void parallel_C_add_AB
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& C_add_AB,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 )
@@ -712,7 +574,7 @@ void parallel_C_sub_AB
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& C_sub_AB,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 )
@@ -739,7 +601,7 @@ void parallel_C_add_AB_F_sub_DE
   Eigen::MatrixXd& E,
   Eigen::MatrixXd& F,
   Eigen::MatrixXd& C_add_AB_F_sub_DE,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 )
@@ -763,7 +625,7 @@ void parallel_matrix_addition
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& A_B,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 )
@@ -785,7 +647,7 @@ void parallel_matrix_subtraction
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& A_B,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size
 )
@@ -808,7 +670,7 @@ void parallel_sparse_block_conjugate_gradient_v2
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size,
   int num_rows
@@ -885,7 +747,7 @@ void parallel_sparse_block_conjugate_gradient_v3//preconditioning
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size,
   int num_rows,
@@ -981,7 +843,7 @@ void parallel_sparse_block_conjugate_gradient_v4//preconditioning
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  MPI_Comm comm,//boost::mpi::communicator& comm,
+  MPI_Comm comm,
   int rank,
   int size,
   int num_rows,

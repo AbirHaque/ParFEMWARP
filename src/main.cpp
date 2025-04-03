@@ -39,7 +39,6 @@ Notes:
 */
 
 #define _USE_MATH_DEFINES
-//#define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
 #include <iostream>
 #include <fstream>
@@ -59,25 +58,12 @@ Notes:
 #include <numeric>
 #include <algorithm>
 #include <ctime>
-//#include <boost/serialization/vector.hpp>
-//#include <boost/serialization/unordered_map.hpp>
-//#include <boost/serialization/set.hpp>
-//#include <boost/archive/text_oarchive.hpp>
-//#include <boost/archive/text_iarchive.hpp>
-//#include <boost/serialization/string.hpp>
-//#include <boost/mpi/collectives/all_gather.hpp>
-//#include <boost/mpi/collectives/all_gatherv.hpp>
-//#include <boost/mpi.hpp>
 #include <Eigen/Eigen>
 #include <Eigen/Core>
 #include <Eigen/Sparse>
 #include "./csr.hpp"
 #include "./matrix_helper.hpp"
 #include "./FEMWARP.hpp"
-//#include <boost/graph/adjacency_list.hpp>
-//#include <boost/graph/cuthill_mckee_ordering.hpp>
-//#include <boost/graph/properties.hpp>
-//#include <boost/graph/bandwidth.hpp>
 
 
 #define DEF_ANGLE 0.01745
@@ -122,8 +108,6 @@ void parallel_affine_transformation(Eigen::MatrixXd& Z_cur_boundary){
 
 void distributed_test_sbcc_2025(int argc, char *argv[]){
 
-  //boost::mpi::environment env{argc, argv};
-  //boost::mpi::communicator comm;
   //MPI_Init(&argc,&argv);
   MPI_Comm comm = MPI_COMM_WORLD;
 int n;//Number nodes
@@ -272,8 +256,6 @@ double start,end;
 
 void distributed_test_packed_6(int argc, char *argv[]){
 
-  //boost::mpi::environment env{argc, argv};
-  //boost::mpi::communicator comm;
   MPI_Init(&argc,&argv);
   MPI_Comm comm = MPI_COMM_WORLD;
 
@@ -388,8 +370,6 @@ void distributed_test_packed_6(int argc, char *argv[]){
 
 void distributed_test_packed_3(int argc, char *argv[]){
 
-  //boost::mpi::environment env{argc, argv};
-  //boost::mpi::communicator comm;
   MPI_Init(&argc,&argv);
   MPI_Comm comm = MPI_COMM_WORLD;
 
@@ -679,8 +659,6 @@ void serial_multistep_test(int argc, char *argv[]){
 
 void distributed_multistep_test_packed_6(int argc, char *argv[]){
 
-  //boost::mpi::environment env{argc, argv};
-  //boost::mpi::communicator comm;
   MPI_Init(&argc,&argv);
   MPI_Comm comm = MPI_COMM_WORLD;
 
@@ -997,8 +975,6 @@ void serial_multistep_test_crm(int argc, char *argv[]){
 
 void distributed_multistep_test_packed_6_crm(int argc, char *argv[]){
 
-  //boost::mpi::environment env{argc, argv};
-  //boost::mpi::communicator comm;
   MPI_Init(&argc,&argv);MPI_Comm comm = MPI_COMM_WORLD;
   int n;//Number nodes
   int m;//Number of interior nodes

@@ -54,15 +54,6 @@ Notes:
 #include <list>
 #include <queue>
 #include <numeric>
-//#include <boost/serialization/vector.hpp>
-//#include <boost/serialization/unordered_map.hpp>
-//#include <boost/serialization/set.hpp>
-//#include <boost/archive/text_oarchive.hpp>
-//#include <boost/archive/text_iarchive.hpp>
-//#include <boost/serialization/string.hpp>
-//#include <boost/mpi/collectives/all_gather.hpp>
-//#include <boost/mpi/collectives/all_gatherv.hpp>
-//#include <boost/mpi.hpp>
 #include <Eigen/Eigen>
 #include <Eigen/Core>
 #include <Eigen/Sparse>
@@ -86,7 +77,6 @@ void distributed_femwarp3d_RMA//works
   Eigen::MatrixXi& T,
   int n,int m,int b,int num_eles,
   MPI_Comm comm,
-  //boost::mpi::communicator comm,
   int size,
   int rank,
   Eigen::MatrixXd& Z_femwarp_transformed
@@ -452,7 +442,6 @@ void distributed_femwarp3d_SHM_RMA //works
   Eigen::MatrixXi& T,
   int n,int m,int b,int num_eles,
   MPI_Comm comm,
-  //boost::mpi::communicator comm,
   int size,
   int rank,
   Eigen::MatrixXd& Z_femwarp_transformed
@@ -1019,20 +1008,6 @@ void distributed_femwarp3d_SHM_RMA //works
         }
         MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime();
       }
-      /*for(l=0;l<num_nodes;l++){
-          if(l==inter_rank&&shmrank==0){
-              cout<<"Merge ========"<<"\n";
-              for(i=0;i<m;i++){
-                cout<<shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF]<<": ";
-                for(k=1;k<shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF];k++){
-                  cout<<shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+k]<<" ";
-                }
-                cout<<"\n";
-              }
-              cout<<"\n";
-          }
-          MPI_Barrier(MPI_COMM_WORLD);
-        }*/
     }
 
     else{
@@ -1375,7 +1350,6 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   Eigen::MatrixXi& T,
   int n,int m,int b,int num_eles,
   MPI_Comm comm,
-  //boost::mpi::communicator comm,
   int size,
   int rank,
   Eigen::MatrixXd& Z_femwarp_transformed
