@@ -20,17 +20,17 @@ License Notice:
     along with ParFEMWARP in the file labeled LICENSE.txt.  If not, see https://www.gnu.org/licenses/agpl-3.0.txt
 
 
-Author: 
+Author:
     Abir Haque
 
-Date Last Updated: 
-    March 5th, 2025
+Date Last Updated:
+    April 3rd, 2025
 
-Notes: 
-    This software was developed by Abir Haque in collaboration with Dr. Suzanne M. Shontz at the University of Kansas (KU). 
+Notes:
+    This software was developed by Abir Haque in collaboration with Dr. Suzanne M. Shontz at the University of Kansas (KU).
     This work was supported by the following:
-        HPC facilities operated by the Center for Research Computing at KU supported by NSF Grant OAC-2117449, 
-        REU Supplement to NSF Grant OAC-1808553, 
+        HPC facilities operated by the Center for Research Computing at KU supported by NSF Grant OAC-2117449,
+        REU Supplement to NSF Grant OAC-1808553,
         REU Supplement to NSF Grant CBET-2245153,
         KU School of Engineering Undergraduate Research Fellows Program
     If you wish to use this code in your own work, you must review the license at LICENSE.txt and cite the following paper:
@@ -48,7 +48,7 @@ Notes:
 #include <math.h>
 #include <mpi.h>
 #include <omp.h>
-#include <chrono> 
+#include <chrono>
 #include <algorithm>
 #include <unordered_map>
 #include <set>
@@ -56,15 +56,15 @@ Notes:
 #include <list>
 #include <queue>
 #include <numeric>
-#include <boost/serialization/vector.hpp>
-#include <boost/serialization/unordered_map.hpp>
-#include <boost/serialization/set.hpp>
+/*#include <boost/serialization/vector.hpp>
+//#include <boost/serialization/unordered_map.hpp>
+//#include <boost/serialization/set.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/string.hpp>
-#include <boost/mpi/collectives/all_gather.hpp>
-#include <boost/mpi/collectives/all_gatherv.hpp>
-#include <boost/mpi.hpp>
+//#include <boost/mpi/collectives/all_gather.hpp>
+//#include <boost/mpi/collectives/all_gatherv.hpp>
+#include <boost/mpi.hpp>*/
 #include <Eigen/Eigen>
 #include <Eigen/Sparse>
 #include <Eigen/Core>
@@ -76,9 +76,9 @@ using namespace std;
 
 double volume_tetrahedron
 (
-  double a[], 
-  double b[], 
-  double c[], 
+  double a[],
+  double b[],
+  double c[],
   double d[]
 )
 {
@@ -109,9 +109,9 @@ Eigen::Matrix4d gen_element_stiffness_matrix_tetrahedron
 
 void gen_basis_function_gradients_tetrahedron
 (
-  double* a, 
-  double* b, 
-  double* c, 
+  double* a,
+  double* b,
+  double* c,
   double* d,
   Eigen::Matrix4d& ret
 )
@@ -139,7 +139,7 @@ void gen_basis_function_gradients_tetrahedron
   vector_b << A.partialPivLu().solve(vector_b);//TODO need to convert into matrix
   for(int i = 0; i < 16; i++){
     ret(i/4,i%4)=vector_b(i);
-  }  
+  }
 }
 
 int gen_neighbors_csr
@@ -172,7 +172,7 @@ void csr_to_dist_csr
   CSR_Matrix& csr_matrix,
   CSR_Matrix& dist_csr_matrix_part,
   int rows,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int size,
   int rank
 )
@@ -183,8 +183,8 @@ void csr_to_dist_csr
     vtxdist[i]=i*num_rows_per_part;
   }
   vtxdist[size]=rows;
-  comm.barrier();
-  vector<vector<int>> local_row_ptrs;
+  MPI_Barrier(comm);
+  /*vector<vector<int>> local_row_ptrs;
   vector<vector<int>> local_col_inds;
   vector<vector<double>> local_datas;
   if (rank==0){
@@ -209,13 +209,109 @@ void csr_to_dist_csr
       col_offset+=local_row_ptrs.back().back();
     }
   }
-  comm.barrier();
+  MPI_Barrier(comm);
   vector<int> local_row_ptr;
   vector<int> local_col_ind;
   vector<double> local_data;
-  boost::mpi::scatter(comm,local_row_ptrs,local_row_ptr,0);
-  boost::mpi::scatter(comm,local_col_inds,local_col_ind,0);
-  boost::mpi::scatter(comm,local_datas,local_data,0);
+  boost::mpi::communicator b_comm;
+  boost::mpi::scatter(b_comm,local_row_ptrs,local_row_ptr,0);
+  boost::mpi::scatter(b_comm,local_col_inds,local_col_ind,0);
+  boost::mpi::scatter(b_comm,local_datas,local_data,0);*/
+
+
+  vector<vector<int>> local_row_ptrs;
+  vector<vector<int>> local_col_inds;
+  vector<vector<double>> local_datas;
+  int tmp1_size=0;
+  int tmp2_size=0;
+  int tmp3_size=0;
+
+  int* local_row_ptr_buf;
+  int* local_col_ind_buf;
+  double* local_data_buf;
+
+  int local_row_ptr_buf_sendcounts[size];
+  int local_row_ptr_buf_displs[size]={0};
+  int local_row_ptr_buf_recvcount;
+
+  int local_col_ind_buf_sendcounts[size];
+  int local_col_ind_buf_displs[size]={0};
+  int local_col_ind_buf_recvcount;
+
+  int local_data_buf_sendcounts[size];
+  int local_data_buf_displs[size]={0};
+  int local_data_buf_recvcount;
+
+  if (rank==0){
+    int col_offset=0;
+    for(int i = 0; i < size;i++){
+      int start_offset=vtxdist[i];
+      int end_offset=vtxdist[i+1]+1;
+      tmp1_size+=end_offset-start_offset;
+      local_row_ptr_buf_sendcounts[i]=end_offset-start_offset;
+      vector<int> tmp1(local_row_ptr_buf_sendcounts[i]);
+      for(int j = start_offset; j < end_offset; j++){
+        tmp1[j-start_offset]=csr_matrix._row_ptrs[j]-csr_matrix._row_ptrs[start_offset];
+      }
+      local_row_ptrs.push_back(tmp1);
+      int tmp23_size=local_row_ptrs[i].back()-local_row_ptrs[i][0];
+      tmp2_size+=tmp23_size;
+      tmp3_size+=tmp23_size;
+      local_col_ind_buf_sendcounts[i]=tmp23_size;
+      local_data_buf_sendcounts[i]=tmp23_size;
+      vector<int> tmp2(tmp23_size);
+      vector<double> tmp3(tmp23_size);
+      for(int j = local_row_ptrs[i][0]; j < local_row_ptrs[i].back(); j++){
+        tmp2[j]=csr_matrix._col_indices[j+col_offset];
+        tmp3[j]=csr_matrix._vals[j+col_offset];
+      }
+      local_col_inds.push_back(tmp2);
+      local_datas.push_back(tmp3);
+      col_offset+=local_row_ptrs.back().back();
+    }
+    local_row_ptr_buf=(int*)malloc(tmp1_size*sizeof(int));
+    local_col_ind_buf=(int*)malloc(tmp2_size*sizeof(int));
+    local_data_buf=(double*) malloc(tmp3_size*sizeof(double));
+    memcpy(local_row_ptr_buf, local_row_ptrs[0].data(), local_row_ptrs[0].size()*sizeof(int));
+    memcpy(local_col_ind_buf, local_col_inds[0].data(), local_col_inds[0].size()*sizeof(int));
+    memcpy(local_data_buf, local_datas[0].data(), local_datas[0].size()*sizeof(double));
+    for(int i = 1; i < size; i++){
+      local_row_ptr_buf_displs[i]=local_row_ptr_buf_displs[i-1]+local_row_ptr_buf_sendcounts[i-1];
+      local_col_ind_buf_displs[i]=local_col_ind_buf_displs[i-1]+local_col_ind_buf_sendcounts[i-1];
+      local_data_buf_displs[i]=local_data_buf_displs[i-1]+local_data_buf_sendcounts[i-1];
+      memcpy(&local_row_ptr_buf[local_row_ptr_buf_displs[i]], local_row_ptrs[i].data(), local_row_ptrs[i].size()*sizeof(int));
+      memcpy(&local_col_ind_buf[local_col_ind_buf_displs[i]], local_col_inds[i].data(), local_col_inds[i].size()*sizeof(int));
+      memcpy(&local_data_buf[local_data_buf_displs[i]], local_datas[i].data(), local_datas[i].size()*sizeof(double));
+    }
+  }
+  MPI_Barrier(comm);
+  MPI_Bcast(local_row_ptr_buf_sendcounts,size,MPI_INT,0,comm);
+  MPI_Bcast(local_row_ptr_buf_displs,size,MPI_INT,0,comm);
+  MPI_Bcast(local_col_ind_buf_sendcounts,size,MPI_INT,0,comm);
+  MPI_Bcast(local_col_ind_buf_displs,size,MPI_INT,0,comm);
+  MPI_Bcast(local_data_buf_sendcounts,size,MPI_INT,0,comm);
+  MPI_Bcast(local_data_buf_displs,size,MPI_INT,0,comm);
+  vector<int> local_row_ptr(local_row_ptr_buf_sendcounts[rank]);
+  vector<int> local_col_ind(local_col_ind_buf_sendcounts[rank]);
+  vector<double> local_data(local_data_buf_sendcounts[rank]);
+  MPI_Scatterv(local_row_ptr_buf,local_row_ptr_buf_sendcounts,local_row_ptr_buf_displs,MPI_INT,local_row_ptr.data(),local_row_ptr_buf_sendcounts[rank],MPI_INT,0,comm);
+  MPI_Scatterv(local_col_ind_buf,local_col_ind_buf_sendcounts,local_col_ind_buf_displs,MPI_INT,local_col_ind.data(),local_col_ind_buf_sendcounts[rank],MPI_INT,0,comm);
+  MPI_Scatterv(local_data_buf,local_data_buf_sendcounts,local_data_buf_displs,MPI_DOUBLE,local_data.data(),local_data_buf_sendcounts[rank],MPI_DOUBLE,0,comm);
+  MPI_Barrier(comm);
+
+  if(rank==0){
+    free(local_row_ptr_buf);
+    free(local_col_ind_buf);
+    free(local_data_buf);
+  }
+  /*boost::mpi::communicator b_comm;
+  boost::mpi::scatter(b_comm,local_row_ptrs,local_row_ptr,0);
+  boost::mpi::scatter(b_comm,local_col_inds,local_col_ind,0);
+  boost::mpi::scatter(b_comm,local_datas,local_data,0);*/
+
+
+
+
   dist_csr_matrix_part._num_vals=local_data.size();
   dist_csr_matrix_part._num_col_indices=local_col_ind.size();
   dist_csr_matrix_part._num_row_ptrs=local_row_ptr.size();
@@ -239,7 +335,7 @@ void parallel_csr_x_matrix
   CSR_Matrix& csr,
   Eigen::MatrixXd& matrix,
   Eigen::MatrixXd& result,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr
@@ -259,19 +355,19 @@ void parallel_csr_x_matrix
       }
       }
   }
-  comm.barrier();
+  MPI_Barrier(comm);
   vector<int> sizes(size);
   for(int i = 0; i < size; i++){
       sizes[i]=num_rows_arr[i]*3;
   }
 
-    
+
   dists[0]=0;
   for(int i = 1; i < size; i++){
     dists[i]=dists[i-1]+sizes[i-1];
   }
 
-    
+
   MPI_Allgatherv(tmp_result.data(), 3*N, MPI_DOUBLE, result.data(), sizes.data(),dists,MPI_DOUBLE, MPI_COMM_WORLD);
   result.transposeInPlace();
 }
@@ -284,7 +380,7 @@ void parallel_csr_x_matrix_optimized
   Eigen::MatrixXd& matrix,
   Eigen::MatrixXd& result,
   Eigen::MatrixXd& tmp_result,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr
@@ -308,7 +404,7 @@ void parallel_csr_x_matrix_optimized
       sizes[i]=num_rows_arr[i]*3;
   }
 
-    
+
   dists[0]=0;
   for(int i = 1; i < size; i++){
     dists[i]=dists[i-1]+sizes[i-1];
@@ -319,12 +415,12 @@ void parallel_csr_x_matrix_optimized
 }
 
 
-void parallel_block_diag_matrix_x_matrix
+/*void parallel_block_diag_matrix_x_matrix
 (
   Eigen::MatrixXd& local_A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& result,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr,
@@ -347,13 +443,13 @@ void parallel_block_diag_matrix_x_matrix
       }
     }
     ////
-    comm.barrier();
+    MPI_Barrier(comm);
     vector<int> sizes(size);
     for(int i = 0; i < size; i++){
         sizes[i]=num_rows_arr[i]*num_cols_in_B;
     }
     boost::mpi::all_gatherv(comm, tmp_result.data(), result.data(),sizes);
-    comm.barrier();
+    MPI_Barrier(comm);
     result.transposeInPlace();
 }
 
@@ -365,7 +461,7 @@ void parallel_block_diag_matrices_x_matrix
   vector<Eigen::MatrixXd>& local_A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& result,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr,
@@ -392,19 +488,19 @@ void parallel_block_diag_matrices_x_matrix
         }
       }
     }
-    
+
     ////
-    comm.barrier();
+    MPI_Barrier(comm);
     vector<int> sizes(size);
     for(int i = 0; i < size; i++){
         sizes[i]=num_rows_arr[i]*num_cols_in_B;
     }
     boost::mpi::all_gatherv(comm, tmp_result.data(), result.data(),sizes);
-    comm.barrier();
+    MPI_Barrier(comm);
     end = MPI_Wtime();
     if(rank==0)cout<<"\t\t\tparallel_block_diag_matrices_x_matrix time: "<<end-start<<endl;
     result.transposeInPlace();
-}
+}*/
 
 
 
@@ -436,7 +532,7 @@ void parallel_diag_matrix_x_matrix
   CSR_Matrix& csr,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& result,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr,
@@ -452,7 +548,7 @@ void parallel_diag_matrix_x_matrix
   for(int i = 0; i < size; i++){
       sizes[i]=num_rows_arr[i]*3;
   }
-  
+
   dists[0]=0;
   for(int i = 1; i < size; i++){
     dists[i]=dists[i-1]+sizes[i-1];
@@ -495,7 +591,7 @@ void parallel_ATxA
 (
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& ATxA,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 )
@@ -505,7 +601,7 @@ void parallel_ATxA
   ATxA.resize(m,m);
   ATxA.setZero();
   int start = rank*(l/size);
-  int end = (rank+1)*(l/size); 
+  int end = (rank+1)*(l/size);
   if(rank==size-1){
     end=l;
   }
@@ -519,7 +615,7 @@ void parallel_ATxB
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& ATxB,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 )
@@ -529,11 +625,11 @@ void parallel_ATxB
   int n=static_cast<int>(B.cols());
   ATxB.setZero();
   int start = rank*(l/size);
-  int end = (rank+1)*(l/size); 
+  int end = (rank+1)*(l/size);
   if(rank==size-1){
     end=l;
   }
-  
+
   ATxB=A.block(start,0,end-start,m).transpose()*B.block(start,0,end-start,m);;
   MPI_Allreduce(MPI_IN_PLACE,ATxB.data(),m*n,MPI_DOUBLE,MPI_SUM,comm);
 }
@@ -545,7 +641,7 @@ void parallel_ATxB_CTxD
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& D,
   Eigen::MatrixXd& ATxB_CTxD,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 )
@@ -555,11 +651,11 @@ void parallel_ATxB_CTxD
   int n=static_cast<int>(B.cols());
   ATxB_CTxD.setZero();
   int start = rank*(l/size);
-  int end = (rank+1)*(l/size); 
+  int end = (rank+1)*(l/size);
   if(rank==size-1){
     end=l;
   }
-  
+
   ATxB_CTxD.block(0,0,3,3)=A.block(start,0,end-start,m).transpose()*B.block(start,0,end-start,m);
   ATxB_CTxD.block(3,0,3,3)=C.block(start,0,end-start,m).transpose()*D.block(start,0,end-start,m);
   MPI_Allreduce(MPI_IN_PLACE,ATxB_CTxD.data(),m*n*2,MPI_DOUBLE,MPI_SUM,comm);
@@ -570,7 +666,7 @@ void parallel_matrix_multiplication
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& AxB,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 )
@@ -580,7 +676,7 @@ void parallel_matrix_multiplication
   int n=static_cast<int>(B.cols());
   AxB.setZero();
   int start = rank*(l/size);
-  int end = (rank+1)*(l/size); 
+  int end = (rank+1)*(l/size);
   if(rank==size-1){
     end=l;
   }
@@ -593,7 +689,7 @@ void parallel_C_add_AB
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& C_add_AB,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 )
@@ -603,7 +699,7 @@ void parallel_C_add_AB
   int n=static_cast<int>(B.cols());
   C_add_AB.setZero();
   int start = rank*(l/size);
-  int end = (rank+1)*(l/size); 
+  int end = (rank+1)*(l/size);
   if(rank==size-1){
     end=l;
   }
@@ -616,7 +712,7 @@ void parallel_C_sub_AB
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& C_sub_AB,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 )
@@ -626,7 +722,7 @@ void parallel_C_sub_AB
   int n=static_cast<int>(B.cols());
   C_sub_AB.setZero();
   int start = rank*(l/size);
-  int end = (rank+1)*(l/size); 
+  int end = (rank+1)*(l/size);
   if(rank==size-1){
     end=l;
   }
@@ -643,7 +739,7 @@ void parallel_C_add_AB_F_sub_DE
   Eigen::MatrixXd& E,
   Eigen::MatrixXd& F,
   Eigen::MatrixXd& C_add_AB_F_sub_DE,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 )
@@ -653,7 +749,7 @@ void parallel_C_add_AB_F_sub_DE
   int n=static_cast<int>(B.cols());
   C_add_AB_F_sub_DE.setZero();
   int start = rank*(l/size);
-  int end = (rank+1)*(l/size); 
+  int end = (rank+1)*(l/size);
   if(rank==size-1){
     end=l;
   }
@@ -667,7 +763,7 @@ void parallel_matrix_addition
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& A_B,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 )
@@ -675,7 +771,7 @@ void parallel_matrix_addition
   int l=static_cast<int>(A.rows());
   int m=static_cast<int>(A.cols());
   int start = rank*(l/size);
-  int end = (rank+1)*(l/size); 
+  int end = (rank+1)*(l/size);
   if(rank==size-1){
     end=l;
   }
@@ -689,7 +785,7 @@ void parallel_matrix_subtraction
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& A_B,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 )
@@ -698,7 +794,7 @@ void parallel_matrix_subtraction
   int m=static_cast<int>(A.cols());
   A_B.setZero();
   int start = rank*(l/size);
-  int end = (rank+1)*(l/size); 
+  int end = (rank+1)*(l/size);
   if(rank==size-1){
     end=l;
   }
@@ -712,7 +808,7 @@ void parallel_sparse_block_conjugate_gradient_v2
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int num_rows
@@ -736,7 +832,7 @@ void parallel_sparse_block_conjugate_gradient_v2
   int local_num_rows=local_A._num_row_ptrs-1;
   int num_rows_arr[size];
   MPI_Allgather(&local_num_rows,1,MPI_INT,num_rows_arr,1,MPI_INT,comm);
-  comm.barrier();
+  MPI_Barrier(comm);
   num_rows_dist = accumulate(num_rows_arr, num_rows_arr+size, num_rows_dist);
 
 
@@ -745,7 +841,7 @@ void parallel_sparse_block_conjugate_gradient_v2
   P=R;
   parallel_ATxA(R,Rold,comm,rank,size);
   Rnew=Rold;
-  comm.barrier();
+  MPI_Barrier(comm);
 double start;
 double end;
 
@@ -789,7 +885,7 @@ void parallel_sparse_block_conjugate_gradient_v3//preconditioning
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int num_rows,
@@ -820,26 +916,26 @@ void parallel_sparse_block_conjugate_gradient_v3//preconditioning
   int local_num_rows=local_A._num_row_ptrs-1;
   int num_rows_arr[size];
   MPI_Allgather(&local_num_rows,1,MPI_INT,num_rows_arr,1,MPI_INT,comm);
-  comm.barrier();
+  MPI_Barrier(comm);
   num_rows_dist = accumulate(num_rows_arr, num_rows_arr+size, num_rows_dist);
   upto_num_rows_dist=accumulate(num_rows_arr, num_rows_arr+rank, upto_num_rows_dist);
-  
+
 double start = MPI_Wtime();
 double end;
   int num_blocks=local_num_rows/block_size;
 
-    
+
 
 
   R=global_b;
   Z.resize(3,num_rows_dist);
- 
+
   parallel_diag_matrix_x_matrix(local_A,R,Z,comm,rank,size,num_rows_arr,upto_num_rows_dist);
 
   P=Z;
   parallel_ATxA(R,Rold,comm,rank,size);
   Rnew=Rold;
-  comm.barrier();
+  MPI_Barrier(comm);
 
 
   tmp_result.resize(3,local_num_rows);
@@ -885,7 +981,7 @@ void parallel_sparse_block_conjugate_gradient_v4//preconditioning
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int num_rows,
@@ -910,7 +1006,7 @@ void parallel_sparse_block_conjugate_gradient_v4//preconditioning
   Eigen::MatrixXd PAP_Rold_wkspc;
   Eigen::MatrixXd X_R_wkspc;
   Eigen::MatrixXd wkspc;
-  
+
 
 
 
@@ -919,26 +1015,26 @@ void parallel_sparse_block_conjugate_gradient_v4//preconditioning
   int local_num_rows=local_A._num_row_ptrs-1;
   int num_rows_arr[size];
   MPI_Allgather(&local_num_rows,1,MPI_INT,num_rows_arr,1,MPI_INT,comm);
-  comm.barrier();
+  MPI_Barrier(comm);
   num_rows_dist = accumulate(num_rows_arr, num_rows_arr+size, num_rows_dist);
   upto_num_rows_dist=accumulate(num_rows_arr, num_rows_arr+rank, upto_num_rows_dist);
-  
+
 double start = MPI_Wtime();
 double end;
   int num_blocks=local_num_rows/block_size;
 
-    
+
 
 
   R=global_b;
   Z.resize(3,num_rows_dist);
- 
+
   parallel_diag_matrix_x_matrix(local_A,R,Z,comm,rank,size,num_rows_arr,upto_num_rows_dist);
-  
+
   P=Z;
   parallel_ATxA(R,Rold,comm,rank,size);
   Rnew=Rold;
-  comm.barrier();
+  MPI_Barrier(comm);
 
 
   tmp_result.resize(3,local_num_rows);
@@ -1065,7 +1161,7 @@ void sparse_block_conjugate_gradient_v3//preconditioning jacobi
   double cur_err = Rnew.trace();
   double start;
   double end;
-  
+
 
   while (cur_err>=threshold){
     start = MPI_Wtime();
@@ -1100,7 +1196,7 @@ void icf_forward_solve
   Eigen::MatrixXd& Y
 )
 {
-  
+
 /* TODO */
 }
 
@@ -1111,7 +1207,7 @@ void icf_backward_solve
   Eigen::MatrixXd& X
 )
 {
-  
+
 /* TODO */
 }
 
@@ -1133,7 +1229,7 @@ void icf
   CSR_Matrix& M
 )
 {
-  
+
 /* TODO */
 }
 
@@ -1147,4 +1243,3 @@ void sparse_block_conjugate_gradient_v4//preconditioning ????
 {
 /* TODO */
 }
-

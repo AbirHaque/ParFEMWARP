@@ -20,17 +20,17 @@ License Notice:
     along with ParFEMWARP in the file labeled LICENSE.txt.  If not, see https://www.gnu.org/licenses/agpl-3.0.txt
 
 
-Author: 
+Author:
     Abir Haque
 
-Date Last Updated: 
-    March 5th, 2025
+Date Last Updated:
+    April 3rd, 2025
 
-Notes: 
-    This software was developed by Abir Haque in collaboration with Dr. Suzanne M. Shontz at the University of Kansas (KU). 
+Notes:
+    This software was developed by Abir Haque in collaboration with Dr. Suzanne M. Shontz at the University of Kansas (KU).
     This work was supported by the following:
-        HPC facilities operated by the Center for Research Computing at KU supported by NSF Grant OAC-2117449, 
-        REU Supplement to NSF Grant OAC-1808553, 
+        HPC facilities operated by the Center for Research Computing at KU supported by NSF Grant OAC-2117449,
+        REU Supplement to NSF Grant OAC-1808553,
         REU Supplement to NSF Grant CBET-2245153,
         KU School of Engineering Undergraduate Research Fellows Program
     If you wish to use this code in your own work, you must review the license at LICENSE.txt and cite the following paper:
@@ -47,30 +47,30 @@ Notes:
 #include <sstream>
 #include <mpi.h>
 #include <omp.h>
-#include <chrono> 
+#include <chrono>
 #include <unordered_map>
 #include <set>
 #include <vector>
 #include <list>
 #include <queue>
 #include <numeric>
-#include <boost/serialization/vector.hpp>
-#include <boost/serialization/unordered_map.hpp>
-#include <boost/serialization/set.hpp>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/serialization/string.hpp>
-#include <boost/mpi/collectives/all_gather.hpp>
-#include <boost/mpi/collectives/all_gatherv.hpp>
-#include <boost/mpi.hpp>
+//#include <boost/serialization/vector.hpp>
+//#include <boost/serialization/unordered_map.hpp>
+//#include <boost/serialization/set.hpp>
+//#include <boost/archive/text_oarchive.hpp>
+//#include <boost/archive/text_iarchive.hpp>
+//#include <boost/serialization/string.hpp>
+//#include <boost/mpi/collectives/all_gather.hpp>
+//#include <boost/mpi/collectives/all_gatherv.hpp>
+//#include <boost/mpi.hpp>
 #include <Eigen/Eigen>
 #include <Eigen/Core>
-#include <Eigen/Sparse> 
+#include <Eigen/Sparse>
 #include "./csr.hpp"
 #include "./matrix_helper.hpp"
 
 #define DEBUG (false)
-#define MAX_TET_NODE_NEIGHBORS (120) 
+#define MAX_TET_NODE_NEIGHBORS (120)
 #define MAX_TET_NODE_NEIGHBORS_BUF (MAX_TET_NODE_NEIGHBORS+1)
 
 using namespace std;
@@ -85,7 +85,8 @@ void distributed_femwarp3d_RMA//works
   Eigen::MatrixXd& xy_prime,
   Eigen::MatrixXi& T,
   int n,int m,int b,int num_eles,
-  boost::mpi::communicator comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator comm,
   int size,
   int rank,
   Eigen::MatrixXd& Z_femwarp_transformed
@@ -127,7 +128,7 @@ void distributed_femwarp3d_RMA//works
   Eigen::Matrix4d element_stiffness_matrix;
   char* rec_str_buf=nullptr;
   char* all_gathered_chars=nullptr;
-  
+
 
   int neighbors_chunks=1000;
   int neighbors_chunk_size;
@@ -179,7 +180,7 @@ void distributed_femwarp3d_RMA//works
   int zero=0;
   int tmp_row_size_plus_one;
   int T_i_Xs[4];
-  
+
   int T_chunk_Xs[(high-low)*4];
 
 
@@ -214,9 +215,9 @@ void distributed_femwarp3d_RMA//works
         if(T_i_j<m){
           win_ind=win_chunk_quantize(T_i_j,neighbors_chunk_size,neighbors_chunks);
           inter_win_offset=inter_win_chunk_quantize(T_i_j,win_ind,neighbors_chunks,neighbors_chunk_size,neighbors_chunk_size_last,neighbors_chunks);
-          
-          //double lock_start = MPI_Wtime(); 
-          MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 1, 0, neighbors_wins[win_ind]); 
+
+          //double lock_start = MPI_Wtime();
+          MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 1, 0, neighbors_wins[win_ind]);
           //double lock_end = MPI_Wtime(); cout<<rank<<" lock time: "<<lock_end-lock_start<<"\n";
           MPI_Get_accumulate(&elems, MAX_TET_NODE_NEIGHBORS_BUF, MPI_INT, &elems, MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT, 1, inter_win_offset*MAX_TET_NODE_NEIGHBORS_BUF, MAX_TET_NODE_NEIGHBORS_BUF, MPI_INT, MPI_NO_OP, neighbors_wins[win_ind]);
           MPI_Win_flush_local(1, neighbors_wins[win_ind]);
@@ -343,19 +344,19 @@ void distributed_femwarp3d_RMA//works
   for (n_ele=low; n_ele<high; n_ele++){
     //cout<<rank<<":"<<low<<" "<<n_ele<<""<<high<<"\n";
     //MPI_Get(&T_ele, 4, MPI_UNSIGNED, 0, n_ele*4, 4, MPI_UNSIGNED, T_win);
-    
+
     i_low_4x=(n_ele-low)*4;//MPI_Get_accumulate(&T_ele, 4, MPI_UNSIGNED, &T_ele, 4, MPI_UNSIGNED, 0, n_ele*4, 4, MPI_UNSIGNED, MPI_NO_OP, T_win);
     //MPI_Win_flush_local(0,T_win);
     T_ele[0]=(unsigned int)T_chunk_Xs[i_low_4x];
     T_ele[1]=(unsigned int)T_chunk_Xs[i_low_4x+1];
     T_ele[2]=(unsigned int)T_chunk_Xs[i_low_4x+2];
     T_ele[3]=(unsigned int)T_chunk_Xs[i_low_4x+3];
-    
+
     MPI_Get_accumulate(&Z_nums_0, 3, MPI_DOUBLE, &Z_nums_0, 3, MPI_DOUBLE, 0, T_ele[0]*3, 3, MPI_DOUBLE, MPI_NO_OP, Z_win);
     MPI_Get_accumulate(&Z_nums_1, 3, MPI_DOUBLE, &Z_nums_1, 3, MPI_DOUBLE, 0, T_ele[1]*3, 3, MPI_DOUBLE, MPI_NO_OP, Z_win);
     MPI_Get_accumulate(&Z_nums_2, 3, MPI_DOUBLE, &Z_nums_2, 3, MPI_DOUBLE, 0, T_ele[2]*3, 3, MPI_DOUBLE, MPI_NO_OP, Z_win);
     MPI_Get_accumulate(&Z_nums_3, 3, MPI_DOUBLE, &Z_nums_3, 3, MPI_DOUBLE, 0, T_ele[3]*3, 3, MPI_DOUBLE, MPI_NO_OP, Z_win);
-    
+
     MPI_Win_flush_local(0,Z_win);
 
     a_func[0]=Z_nums_0[0];
@@ -394,7 +395,7 @@ void distributed_femwarp3d_RMA//works
   MPI_Win_unlock_all(Z_win);//MPI_Win_fence(0, Z_win);
   MPI_Barrier(MPI_COMM_WORLD);
   cout<<"MPI_Allreduce "<<rank<<"\n";
-  
+
   for(i = 0; i < AI_matrix._num_vals;i++){
     tmpI[i]=AI_matrix._vals[i];
   }
@@ -404,7 +405,7 @@ void distributed_femwarp3d_RMA//works
   MPI_Allreduce(tmpI,AI_matrix._vals,AI_matrix._num_vals,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
   MPI_Allreduce(tmpB,AB_matrix._vals,AB_matrix._num_vals,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" FEM time: "<<end-start<<"\n";}start = MPI_Wtime();
-  
+
 
 
 
@@ -434,7 +435,7 @@ void distributed_femwarp3d_RMA//works
   MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Times Matrix time: "<<end-start<<"\n";}start = MPI_Wtime();
 
   cout<<"parallel_sparse_block_conjugate_gradient_v2 "<<rank<<"\n";
-  
+
   parallel_sparse_block_conjugate_gradient_v2(local_A_I,A_B_hat,Z_femwarp_transformed,comm,rank,size,num_rows);
 
   MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" CG time: "<<end-start<<"\n";}
@@ -450,7 +451,8 @@ void distributed_femwarp3d_SHM_RMA //works
   Eigen::MatrixXd& xy_prime,
   Eigen::MatrixXi& T,
   int n,int m,int b,int num_eles,
-  boost::mpi::communicator comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator comm,
   int size,
   int rank,
   Eigen::MatrixXd& Z_femwarp_transformed
@@ -468,7 +470,7 @@ void distributed_femwarp3d_SHM_RMA //works
   MPI_Comm_size(shmcomm, &shmsize);
   int num_nodes=size/shmsize;
 
-  
+
   MPI_Comm inter_comm;
   int inter_rank=-1;
   int inter_size=-1;
@@ -507,13 +509,13 @@ void distributed_femwarp3d_SHM_RMA //works
   unordered_map<int, set<int>> AB_dict;
   unordered_map<int, set<int>> local_neighbors;
   unordered_map<int, set<int>> master_neighbor_dict[size];
-  
+
 
   Eigen::Matrix4d basis_function_gradients;
   Eigen::Matrix4d element_stiffness_matrix;
   char* rec_str_buf=nullptr;
   char* all_gathered_chars=nullptr;
-  
+
 
   int neighbors_chunks=size;
   int neighbors_chunk_size;
@@ -525,7 +527,7 @@ void distributed_femwarp3d_SHM_RMA //works
 
   MPI_Aint size_of_shmem;
   int disp_unit;
-  
+
   if(rank==0){
     cout<<"Job Information:"<<"\n";
     cout<<"\tRanks: "<<size<<"\n";
@@ -543,9 +545,9 @@ void distributed_femwarp3d_SHM_RMA //works
   int neighbors[shmrank==0?m:1][shmrank==0?MAX_TET_NODE_NEIGHBORS_BUF:1]={0};//neighbors[rank==size-1?neighbors_chunk_size_last:neighbors_chunk_size][MAX_TET_NODE_NEIGHBORS_BUF];
   vector<int*> shared_neigbors_arr(shmsize);
 
-  
+
   vector<MPI_Win> shared_win(shmsize);
-  
+
 
 
   if(shmrank==0){
@@ -624,7 +626,7 @@ void distributed_femwarp3d_SHM_RMA //works
   int zero=0;
   int tmp_row_size_plus_one;
   int T_i_Xs[4];
-  
+
   int T_chunk_Xs[(high-low)*4];
 
 
@@ -638,7 +640,7 @@ void distributed_femwarp3d_SHM_RMA //works
   MPI_Win_flush_local(0,T_win);
 
   MPI_Win_unlock_all(T_win);
-  
+
   int i_low_4x;
   int rank_to_send_val;
   int local_index;
@@ -723,10 +725,10 @@ void distributed_femwarp3d_SHM_RMA //works
     }
   }
 
-  
+
   MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Lists time: "<<end-start<<"\n";}start = MPI_Wtime();
 
-  
+
   int shm_parts=m/shmsize;
   int shm_start=shmrank*shm_parts;
   int shm_end=shmrank==shmsize-1?m:(shmrank+1)*shm_parts;
@@ -762,7 +764,7 @@ void distributed_femwarp3d_SHM_RMA //works
             //Insert element
             //local_neighbors[T_i_j].insert(T_i_k);
             shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0]=row_size;
-            
+
             //shift old elements forward by 1
             for(l=row_size;l>=N_ind;l--){
               shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l]=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l-1];
@@ -780,9 +782,9 @@ void distributed_femwarp3d_SHM_RMA //works
       }
     }
   }
-  
+
   MPI_Barrier(MPI_COMM_WORLD);
-  
+
   MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Combine lists 1 time: "<<end-start<<"\n";}start = MPI_Wtime();
 
 
@@ -818,15 +820,15 @@ void distributed_femwarp3d_SHM_RMA //works
             memcpy(tmp_neighbors[i]+m_start*MAX_TET_NODE_NEIGHBORS_BUF /*technically start for node*/,tmp_tmp_neighbors[i][m_start/*technically start for node*/],(start_end_nodes[rank/shmsize+1]-m_start)*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int));
           }
         }
-        
-        
-        
-        
+
+
+
+
         MPI_Barrier(MPI_COMM_WORLD);if(rank==0){cout<<rank<<" memcpy 1 time: "<<MPI_Wtime()-start<<"\n";}
-        
-        
-        
-        
+
+
+
+
         for(i=m_start;i<m_end;i++){
           row_size=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0];
           for(j=0;j<num_nodes;j++){
@@ -857,7 +859,7 @@ void distributed_femwarp3d_SHM_RMA //works
                   //Insert element
                   //local_neighbors[T_i_j].insert(T_i_k);
                   shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0]=row_size;
-        
+
                   for(l=row_size;l>=N_ind;l--){
                     shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l]=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l-1];
                   }
@@ -869,11 +871,11 @@ void distributed_femwarp3d_SHM_RMA //works
           int mid_div = std::lower_bound(&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+1],&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+row_size+1],m)-&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+1];
           loc_num_vals_in_AI+=mid_div;
           loc_num_vals_in_AB+=row_size-mid_div;
-        
+
         }
-        
+
         MPI_Barrier(MPI_COMM_WORLD);if(rank==0){cout<<rank<<" Merge time: "<<MPI_Wtime()-start<<"\n";}
-        
+
         if(shmrank==0){
           int tmp_tmp_neighbors[num_nodes][m][MAX_TET_NODE_NEIGHBORS_BUF]={0};
           MPI_Allgather(shared_neigbors_arr[0],m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,tmp_tmp_neighbors,m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,inter_comm);
@@ -882,7 +884,7 @@ void distributed_femwarp3d_SHM_RMA //works
             memcpy(shared_neigbors_arr[0]+start_end_nodes[i]*MAX_TET_NODE_NEIGHBORS_BUF,tmp_tmp_neighbors[i][start_end_nodes[i]],(start_end_nodes[i+1]-start_end_nodes[i])*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int));
           }
         }
-        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime(); 
+        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime();
       }
       else{
         int m_parts=m/size;
@@ -901,10 +903,10 @@ void distributed_femwarp3d_SHM_RMA //works
         }
         start_end_nodes[num_nodes]=m;
         counts_send[num_nodes-1]=(start_end_nodes[num_nodes]-start_end_nodes[num_nodes-1])*MAX_TET_NODE_NEIGHBORS_BUF;
-        
+
 
         int neighors_T_size=shmrank==0?counts_send[inter_rank]*num_nodes:1;
-        
+
 
         int neighors_T[neighors_T_size]={0};
         MPI_Win neighors_T_win;
@@ -914,7 +916,7 @@ void distributed_femwarp3d_SHM_RMA //works
           MPI_Win_create(neighors_T, neighors_T_size*sizeof(int), sizeof(int), MPI_INFO_NULL, inter_comm, &neighors_T_win);
           MPI_Win_create(shared_neigbors_arr[0], m*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int), sizeof(int), MPI_INFO_NULL, inter_comm, &local_master_neighors_win);
         }MPI_Barrier(MPI_COMM_WORLD);
-        
+
         if(shmrank==0){
           MPI_Win_lock_all(0, neighors_T_win);//MPI_Win_fence(0, neighors_T_win);
           //MPI_Allgather(shared_neigbors_arr[0],m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,tmp_tmp_neighbors,m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,inter_comm);}
@@ -926,7 +928,7 @@ void distributed_femwarp3d_SHM_RMA //works
           }
           MPI_Win_flush_local_all(neighors_T_win);
           MPI_Win_flush_all(neighors_T_win);
-          
+
           MPI_Win_unlock_all(neighors_T_win);//MPI_Win_fence(0, neighors_T_win);
 
           MPI_Barrier(inter_comm);
@@ -975,7 +977,7 @@ void distributed_femwarp3d_SHM_RMA //works
                   //Insert element
                   //local_neighbors[T_i_j].insert(T_i_k);
                   shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0]=row_size;
-        
+
                   for(l=row_size;l>=N_ind;l--){
                     shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l]=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l-1];
                   }
@@ -987,11 +989,11 @@ void distributed_femwarp3d_SHM_RMA //works
           int mid_div = std::lower_bound(&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+1],&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+row_size+1],m)-&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+1];
           loc_num_vals_in_AI+=mid_div;
           loc_num_vals_in_AB+=row_size-mid_div;
-        
+
         }
-        
+
         MPI_Barrier(MPI_COMM_WORLD);if(rank==0){cout<<rank<<" DEBUG Merge time: "<<MPI_Wtime()-start<<"\n";}
-        
+
         if(shmrank==0){
           MPI_Win_lock_all(0, local_master_neighors_win);
           //int tmp_tmp_neighbors[num_nodes][m][MAX_TET_NODE_NEIGHBORS_BUF]={0};
@@ -1002,7 +1004,7 @@ void distributed_femwarp3d_SHM_RMA //works
           }
           MPI_Win_flush_local_all(local_master_neighors_win);
           MPI_Win_flush_all(local_master_neighors_win);
-          
+
           MPI_Win_unlock_all(local_master_neighors_win);
 
           MPI_Barrier(inter_comm);if(rank==0){cout<<rank<<" DEBUG MPI_Allgather 2 time: "<<MPI_Wtime()-start<<"\n";}
@@ -1012,10 +1014,10 @@ void distributed_femwarp3d_SHM_RMA //works
             //memcpy(tmp_neighbors[i]+m_start*MAX_TET_NODE_NEIGHBORS_BUF,neighors_T+i*counts_send[inter_rank],(start_end_nodes[rank/shmsize+1]-m_start)*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int));
             //Just copy from first part of neighors_T_win or maybe another rma window into appropriate part of shared_neigbors_arr[0]
             //memcpy(shared_neigbors_arr[0]+start_end_nodes[i]*MAX_TET_NODE_NEIGHBORS_BUF,/*tmp_tmp_neighbors[i][start_end_nodes[i]]*/neighors_T+i*counts_send[inter_rank]+start_end_nodes[i],(start_end_nodes[i+1]-start_end_nodes[i])*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int));
-            
+
           }
         }
-        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime(); 
+        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime();
       }
       /*for(l=0;l<num_nodes;l++){
           if(l==inter_rank&&shmrank==0){
@@ -1058,7 +1060,7 @@ void distributed_femwarp3d_SHM_RMA //works
 
       //only want first node assembling
       if(1){//rank<shmsize){//rank==0){
-        
+
         int shm_parts=m/shmsize;
         int shm_start=shmrank*shm_parts;
         int shm_end=shmrank==shmsize-1?m:(shmrank+1)*shm_parts;
@@ -1093,7 +1095,7 @@ void distributed_femwarp3d_SHM_RMA //works
                   //Insert element
                   //local_neighbors[T_i_j].insert(T_i_k);
                   shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0]=row_size;
-                  
+
                   for(l=row_size;l>=N_ind;l--){
                     shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l]=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l-1];
                   }
@@ -1139,7 +1141,7 @@ void distributed_femwarp3d_SHM_RMA //works
 
   //cout<<"CSR_Matrix "<<rank<<"\n";
 
-  
+
 
 
   int AB_val_count=0;
@@ -1167,7 +1169,7 @@ void distributed_femwarp3d_SHM_RMA //works
     }
     //cout<<"setRowPtrsAt "<<rank<<"\n";
     AI_matrix.setRowPtrsAt(m,AI_col_indices_pos);
-    AB_matrix.setRowPtrsAt(m,AB_col_indices_pos); 
+    AB_matrix.setRowPtrsAt(m,AB_col_indices_pos);
   }
   //MPI_Barrier(MPI_COMM_WORLD);
   //if(shmrank==0){cout<<rank<<" [Part 0] CSR Matrix Allocation time: "<<MPI_Wtime()-start<<"\n";}
@@ -1182,7 +1184,7 @@ void distributed_femwarp3d_SHM_RMA //works
   MPI_Win shared_tmpI_c_win;
   int* shared_tmpB_c;
   MPI_Win shared_tmpB_c_win;
-  
+
 
 
   if(shmrank==0){
@@ -1259,7 +1261,7 @@ void distributed_femwarp3d_SHM_RMA //works
   MPI_Win_free(&shared_tmpB_c_win);
   MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" MPI_Win_free time: "<<end-start<<"\n";}start = MPI_Wtime();
 
-  
+
   for (n_ele=low; n_ele<high; n_ele++){
 
     i_low_4x=(n_ele-low)*4;
@@ -1307,11 +1309,11 @@ void distributed_femwarp3d_SHM_RMA //works
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  
+
   memcpy(tmpI,AI_matrix._vals,AI_matrix._num_vals*sizeof(double));
   memcpy(tmpB,AB_matrix._vals,AB_matrix._num_vals*sizeof(double));
 
-  
+
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Allreduce(tmpI,AI_matrix._vals,AI_matrix._num_vals,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
@@ -1346,8 +1348,8 @@ void distributed_femwarp3d_SHM_RMA //works
   MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Times Matrix time: "<<end-start<<"\n";}start = MPI_Wtime();
 
   //cout<<"parallel_sparse_block_conjugate_gradient_v3 "<<rank<<"\n";
-  
-  
+
+
 
 
   int block_size=1;
@@ -1372,7 +1374,8 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   void (*deformation_functions[])(Eigen::MatrixXd&),int num_deformations,
   Eigen::MatrixXi& T,
   int n,int m,int b,int num_eles,
-  boost::mpi::communicator comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator comm,
   int size,
   int rank,
   Eigen::MatrixXd& Z_femwarp_transformed
@@ -1390,7 +1393,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   MPI_Comm_size(shmcomm, &shmsize);
   int num_nodes=size/shmsize;
 
-  
+
   MPI_Comm inter_comm;
   int inter_rank=-1;
   int inter_size=-1;
@@ -1429,13 +1432,13 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   unordered_map<int, set<int>> AB_dict;
   unordered_map<int, set<int>> local_neighbors;
   unordered_map<int, set<int>> master_neighbor_dict[size];
-  
+
 
   Eigen::Matrix4d basis_function_gradients;
   Eigen::Matrix4d element_stiffness_matrix;
   char* rec_str_buf=nullptr;
   char* all_gathered_chars=nullptr;
-  
+
 
   int neighbors_chunks=size;
   int neighbors_chunk_size;
@@ -1447,10 +1450,10 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   MPI_Aint size_of_shmem;
   int disp_unit;
 
-  
+
   Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> Z_cur_boundary;
   Z_cur_boundary=Z_original.block(n-b,0,b,3);//Get only boundary nodes
-  
+
   if(rank==0){
     cout<<"Job Information:"<<"\n";
     cout<<"\tRanks: "<<size<<"\n";
@@ -1468,9 +1471,9 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   int neighbors[shmrank==0?m:1][shmrank==0?MAX_TET_NODE_NEIGHBORS_BUF:1]={0};
   vector<int*> shared_neigbors_arr(shmsize);
 
-  
+
   vector<MPI_Win> shared_win(shmsize);
-  
+
 
 
   if(shmrank==0){
@@ -1531,7 +1534,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   int zero=0;
   int tmp_row_size_plus_one;
   int T_i_Xs[4];
-  
+
   int T_chunk_Xs[(high-low)*4];
 
 
@@ -1545,7 +1548,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   MPI_Win_flush_local(0,T_win);
 
   MPI_Win_unlock_all(T_win);
-  
+
   int i_low_4x;
   int rank_to_send_val;
   int local_index;
@@ -1612,7 +1615,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
                 for(l=row_size;l>=N_ind;l--){
                   shared_neigbors_arr[shmrank][T_i_j*MAX_TET_NODE_NEIGHBORS_BUF+l]=shared_neigbors_arr[shmrank][T_i_j*MAX_TET_NODE_NEIGHBORS_BUF+l-1];
                 }
-                
+
                 shared_neigbors_arr[shmrank][T_i_j*MAX_TET_NODE_NEIGHBORS_BUF+N_ind]=T_i_k;
                 if(T_i_k<m && (REDUNDANT?rank==0:(num_nodes==1?rank==0:false))){
                   loc_num_vals_in_AI+=1;
@@ -1628,10 +1631,10 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
     }
   }
 
-  
+
   MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Lists time: "<<end-start<<"\n";}start = MPI_Wtime();
 
-  
+
   int shm_parts=m/shmsize;
   int shm_start=shmrank*shm_parts;
   int shm_end=shmrank==shmsize-1?m:(shmrank+1)*shm_parts;
@@ -1682,14 +1685,14 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
       }
     }
   }
-  
+
   MPI_Barrier(MPI_COMM_WORLD);
-  
+
   MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Combine lists 1 time: "<<end-start<<"\n";}start = MPI_Wtime();
 
 
-  
-  
+
+
   ///////////////////Combine across multiple nodes///////////////
   if(num_nodes>1){
     if(!REDUNDANT){
@@ -1720,11 +1723,11 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
             memcpy(tmp_neighbors[i]+m_start*MAX_TET_NODE_NEIGHBORS_BUF /*technically start for node*/,tmp_tmp_neighbors[i][m_start/*technically start for node*/],(start_end_nodes[rank/shmsize+1]-m_start)*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int));
           }
         }
-        
-      
+
+
         MPI_Barrier(MPI_COMM_WORLD);if(rank==0){cout<<rank<<" memcpy 1 time: "<<MPI_Wtime()-start<<"\n";}
-        
-        
+
+
         for(i=m_start;i<m_end;i++){
           row_size=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0];
           for(j=0;j<num_nodes;j++){
@@ -1754,7 +1757,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
                 else{
                   //Insert element
                   shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0]=row_size;
-        
+
                   for(l=row_size;l>=N_ind;l--){
                     shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l]=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l-1];
                   }
@@ -1766,11 +1769,11 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
           int mid_div = std::lower_bound(&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+1],&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+row_size+1],m)-&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+1];
           loc_num_vals_in_AI+=mid_div;
           loc_num_vals_in_AB+=row_size-mid_div;
-        
+
         }
-        
+
         MPI_Barrier(MPI_COMM_WORLD);if(rank==0){cout<<rank<<" Merge time: "<<MPI_Wtime()-start<<"\n";}
-        
+
         if(shmrank==0){
           int tmp_tmp_neighbors[num_nodes][m][MAX_TET_NODE_NEIGHBORS_BUF]={0};
           MPI_Allgather(shared_neigbors_arr[0],m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,tmp_tmp_neighbors,m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,inter_comm);
@@ -1779,7 +1782,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
             memcpy(shared_neigbors_arr[0]+start_end_nodes[i]*MAX_TET_NODE_NEIGHBORS_BUF,tmp_tmp_neighbors[i][start_end_nodes[i]],(start_end_nodes[i+1]-start_end_nodes[i])*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int));
           }
         }
-        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime(); 
+        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime();
       }
       else{
         int m_parts=m/size;
@@ -1798,10 +1801,10 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
         }
         start_end_nodes[num_nodes]=m;
         counts_send[num_nodes-1]=(start_end_nodes[num_nodes]-start_end_nodes[num_nodes-1])*MAX_TET_NODE_NEIGHBORS_BUF;
-        
+
 
         int neighors_T_size=shmrank==0?counts_send[inter_rank]*num_nodes:1;
-        
+
 
         int neighors_T[neighors_T_size]={0};
         MPI_Win neighors_T_win;
@@ -1811,7 +1814,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
           MPI_Win_create(neighors_T, neighors_T_size*sizeof(int), sizeof(int), MPI_INFO_NULL, inter_comm, &neighors_T_win);
           MPI_Win_create(shared_neigbors_arr[0], m*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int), sizeof(int), MPI_INFO_NULL, inter_comm, &local_master_neighors_win);
         }MPI_Barrier(MPI_COMM_WORLD);
-        
+
         if(shmrank==0){
           MPI_Win_lock_all(0, neighors_T_win);
           for(i=num_nodes-1;i>=0;i--){
@@ -1819,7 +1822,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
           }
           MPI_Win_flush_local_all(neighors_T_win);
           MPI_Win_flush_all(neighors_T_win);
-          
+
           MPI_Win_unlock_all(neighors_T_win);
           MPI_Barrier(inter_comm);
 
@@ -1863,7 +1866,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
                 else{
                   //Insert element
                   shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0]=row_size;
-        
+
                   for(l=row_size;l>=N_ind;l--){
                     shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l]=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l-1];
                   }
@@ -1875,11 +1878,11 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
           int mid_div = std::lower_bound(&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+1],&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+row_size+1],m)-&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+1];
           loc_num_vals_in_AI+=mid_div;
           loc_num_vals_in_AB+=row_size-mid_div;
-        
+
         }
-        
+
         MPI_Barrier(MPI_COMM_WORLD);if(rank==0){cout<<rank<<" DEBUG Merge time: "<<MPI_Wtime()-start<<"\n";}
-        
+
         if(shmrank==0){
           MPI_Win_lock_all(0, local_master_neighors_win);
           for(i=num_nodes-1;i>=0;i--){
@@ -1888,12 +1891,12 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
           }
           MPI_Win_flush_local_all(local_master_neighors_win);
           MPI_Win_flush_all(local_master_neighors_win);
-          
+
           MPI_Win_unlock_all(local_master_neighors_win);
 
           MPI_Barrier(inter_comm);if(rank==0){cout<<rank<<" DEBUG MPI_Allgather 2 time: "<<MPI_Wtime()-start<<"\n";}
         }
-        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime(); 
+        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime();
       }
     }
 
@@ -1940,7 +1943,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
               else{
                 //Insert element
                 shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0]=row_size;
-                
+
                 for(l=row_size;l>=N_ind;l--){
                   shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l]=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l-1];
                 }
@@ -1984,7 +1987,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
 
   //cout<<"CSR_Matrix "<<rank<<"\n";
 
-  
+
 
 
   int AB_val_count=0;
@@ -2011,7 +2014,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
       }
     }
     AI_matrix.setRowPtrsAt(m,AI_col_indices_pos);
-    AB_matrix.setRowPtrsAt(m,AB_col_indices_pos); 
+    AB_matrix.setRowPtrsAt(m,AB_col_indices_pos);
   }
 
 
@@ -2022,7 +2025,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   MPI_Win shared_tmpI_c_win;
   int* shared_tmpB_c;
   MPI_Win shared_tmpB_c_win;
-  
+
 
 
   if(shmrank==0){
@@ -2085,7 +2088,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   MPI_Win_free(&shared_tmpB_c_win);
   MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" MPI_Win_free time: "<<end-start<<"\n";}start = MPI_Wtime();
 
-  
+
   for (n_ele=low; n_ele<high; n_ele++){
 
     i_low_4x=(n_ele-low)*4;
@@ -2133,11 +2136,11 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  
+
   memcpy(tmpI,AI_matrix._vals,AI_matrix._num_vals*sizeof(double));
   memcpy(tmpB,AB_matrix._vals,AB_matrix._num_vals*sizeof(double));
 
-  
+
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Allreduce(tmpI,AI_matrix._vals,AI_matrix._num_vals,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
@@ -2162,13 +2165,13 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
     A_B_hat.resize(3,AI_matrix._num_row_ptrs-1);//Should be (num_rows,3), but mpi gets mad
     A_B_hat.setZero();
     Z_femwarp_transformed.setZero();
-    MPI_Barrier(MPI_COMM_WORLD);start = MPI_Wtime(); 
+    MPI_Barrier(MPI_COMM_WORLD);start = MPI_Wtime();
     (*deformation_functions[i])(Z_cur_boundary);
     parallel_csr_x_matrix(local_A_B,Z_cur_boundary,A_B_hat,comm,rank,size,num_rows_arr);
     MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Times Matrix time: "<<end-start<<"\n";}start = MPI_Wtime();
     int block_size=1;
-    block_size=local_num_rows<block_size?local_num_rows:block_size;  
-    parallel_sparse_block_conjugate_gradient_v3(local_A_I,A_B_hat,Z_femwarp_transformed,comm,rank,size,num_rows,block_size); 
+    block_size=local_num_rows<block_size?local_num_rows:block_size;
+    parallel_sparse_block_conjugate_gradient_v3(local_A_I,A_B_hat,Z_femwarp_transformed,comm,rank,size,num_rows,block_size);
   }
 
 
@@ -2214,7 +2217,7 @@ void serial_femwarp3d
   Eigen::Matrix4d element_stiffness_matrix;
   char* rec_str_buf=nullptr;
   char* all_gathered_chars=nullptr;
-  
+
 
 
   cout<<"Job Information:"<<"\n";
@@ -2330,7 +2333,7 @@ void serial_femwarp3d
   }
 
 
-  
+
   end = MPI_Wtime();if(rank==0){cout<<rank<<" Lists time: "<<end-start<<"\n";}start = MPI_Wtime();
 
   CSR_Matrix AI_matrix(num_vals_in_AI,num_vals_in_AI,m+1);
@@ -2363,13 +2366,13 @@ void serial_femwarp3d
   }
   //cout<<"setRowPtrsAt "<<rank<<"\n";
   AI_matrix.setRowPtrsAt(m,AI_col_indices_pos);
-  AB_matrix.setRowPtrsAt(m,AB_col_indices_pos); 
+  AB_matrix.setRowPtrsAt(m,AB_col_indices_pos);
 
 
   end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}start = MPI_Wtime();
-  
 
-  
+
+
 
   for (n_ele=0; n_ele<num_eles; n_ele++){
 
@@ -2441,7 +2444,7 @@ void serial_multistep_femwarp3d
   Eigen::MatrixXd& Z_original,
   void (*deformation_functions[])(Eigen::MatrixXd&),int num_deformations,
   Eigen::MatrixXi& T,
-  int n,int m,int b,int num_eles, 
+  int n,int m,int b,int num_eles,
   Eigen::MatrixXd& Z_femwarp_transformed
 )
 {
@@ -2465,7 +2468,7 @@ void serial_multistep_femwarp3d
   char* rec_str_buf=nullptr;
   char* all_gathered_chars=nullptr;
 
-  
+
   Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> Z_cur_boundary;
   Z_cur_boundary=Z_original.block(n-b,0,b,3);//Get only boundary nodes
 
@@ -2578,7 +2581,7 @@ void serial_multistep_femwarp3d
   }
 
 
-  
+
   end = MPI_Wtime();if(rank==0){cout<<rank<<" Lists time: "<<end-start<<"\n";}start = MPI_Wtime();
 
   CSR_Matrix AI_matrix(num_vals_in_AI,num_vals_in_AI,m+1);
@@ -2610,7 +2613,7 @@ void serial_multistep_femwarp3d
     }
   }
   AI_matrix.setRowPtrsAt(m,AI_col_indices_pos);
-  AB_matrix.setRowPtrsAt(m,AB_col_indices_pos); 
+  AB_matrix.setRowPtrsAt(m,AB_col_indices_pos);
 
 
   end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}start = MPI_Wtime();
@@ -2673,4 +2676,3 @@ void serial_multistep_femwarp3d
   Z_original.block(0,0,m,3)=Z_femwarp_transformed.eval();
   Z_original.block(m,0,b,3)=Z_cur_boundary.eval();
 }
-

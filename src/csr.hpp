@@ -5,7 +5,7 @@ Copyright Notice:
     Copyright 2025 Abir Haque
 
 License Notice:
-    This file is part of ParFEWMARP
+    This file is part of ParFEMWARP
 
     ParFEMWARP is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License Version 3 as published by
@@ -24,7 +24,7 @@ Author:
     Abir Haque
 
 Date Last Updated: 
-    March 5th, 2025
+    April 3rd, 2025
 
 Notes: 
     This software was developed by Abir Haque in collaboration with Dr. Suzanne M. Shontz at the University of Kansas (KU). 

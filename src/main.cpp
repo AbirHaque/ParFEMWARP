@@ -20,17 +20,17 @@ License Notice:
     along with ParFEMWARP in the file labeled LICENSE.txt.  If not, see https://www.gnu.org/licenses/agpl-3.0.txt
 
 
-Author: 
+Author:
     Abir Haque
 
-Date Last Updated: 
-    March 5th, 2025
+Date Last Updated:
+    April 3rd, 2025
 
-Notes: 
-    This software was developed by Abir Haque in collaboration with Dr. Suzanne M. Shontz at the University of Kansas (KU). 
+Notes:
+    This software was developed by Abir Haque in collaboration with Dr. Suzanne M. Shontz at the University of Kansas (KU).
     This work was supported by the following:
-        HPC facilities operated by the Center for Research Computing at KU supported by NSF Grant OAC-2117449, 
-        REU Supplement to NSF Grant OAC-1808553, 
+        HPC facilities operated by the Center for Research Computing at KU supported by NSF Grant OAC-2117449,
+        REU Supplement to NSF Grant OAC-1808553,
         REU Supplement to NSF Grant CBET-2245153,
         KU School of Engineering Undergraduate Research Fellows Program
     If you wish to use this code in your own work, you must review the license at LICENSE.txt and cite the following paper:
@@ -39,7 +39,7 @@ Notes:
 */
 
 #define _USE_MATH_DEFINES
-#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+//#define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
 #include <iostream>
 #include <fstream>
@@ -50,7 +50,7 @@ Notes:
 #include <sstream>
 #include <mpi.h>
 #include <omp.h>
-#include <chrono> 
+#include <chrono>
 #include <unordered_map>
 #include <set>
 #include <vector>
@@ -59,25 +59,25 @@ Notes:
 #include <numeric>
 #include <algorithm>
 #include <ctime>
-#include <boost/serialization/vector.hpp>
-#include <boost/serialization/unordered_map.hpp>
-#include <boost/serialization/set.hpp>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/serialization/string.hpp>
-#include <boost/mpi/collectives/all_gather.hpp>
-#include <boost/mpi/collectives/all_gatherv.hpp>
-#include <boost/mpi.hpp>
+//#include <boost/serialization/vector.hpp>
+//#include <boost/serialization/unordered_map.hpp>
+//#include <boost/serialization/set.hpp>
+//#include <boost/archive/text_oarchive.hpp>
+//#include <boost/archive/text_iarchive.hpp>
+//#include <boost/serialization/string.hpp>
+//#include <boost/mpi/collectives/all_gather.hpp>
+//#include <boost/mpi/collectives/all_gatherv.hpp>
+//#include <boost/mpi.hpp>
 #include <Eigen/Eigen>
 #include <Eigen/Core>
 #include <Eigen/Sparse>
 #include "./csr.hpp"
 #include "./matrix_helper.hpp"
 #include "./FEMWARP.hpp"
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/cuthill_mckee_ordering.hpp>
-#include <boost/graph/properties.hpp>
-#include <boost/graph/bandwidth.hpp>
+//#include <boost/graph/adjacency_list.hpp>
+//#include <boost/graph/cuthill_mckee_ordering.hpp>
+//#include <boost/graph/properties.hpp>
+//#include <boost/graph/bandwidth.hpp>
 
 
 #define DEF_ANGLE 0.01745
@@ -90,11 +90,193 @@ using namespace std;
 
 
 
+
+
+void parallel_affine_transformation(Eigen::MatrixXd& Z_cur_boundary){
+  int rank;
+  int size;
+  MPI_Comm_rank (MPI_COMM_WORLD, &rank);
+  MPI_Comm_size (MPI_COMM_WORLD, &size);
+  int N=static_cast<int>(Z_cur_boundary.rows());
+  int n_parts=N/size;
+  int n_start=rank*n_parts;
+  int n_end=rank==size-1?N:(rank+1)*n_parts;
+  Eigen::Matrix3d transformation; transformation=Eigen::Scaling(2.0,2.0,2.0);  //Eigen::AngleAxisd transformation (DEF_ANGLE,Eigen::Vector3d::UnitZ());
+  Eigen::Matrix<double,3,3> transformation_matrix_transpose;
+  transformation_matrix_transpose = transformation.transpose();
+  if(rank==0){
+    Z_cur_boundary.block(n_end,0,N-(n_end-n_start),3).setZero();
+  }
+  else if(rank==size-1){
+    Z_cur_boundary.block(0,0,N-(n_end-n_start),3).setZero();
+  }
+  else{
+    Z_cur_boundary.block(0,0,n_start,3).setZero();
+    Z_cur_boundary.block(n_end,0,N-n_end,3).setZero();
+  }
+  Z_cur_boundary.block(n_start,0,n_end-n_start,3)*=transformation_matrix_transpose;
+  MPI_Allreduce(MPI_IN_PLACE,Z_cur_boundary.data(),N*3,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+  MPI_Barrier(MPI_COMM_WORLD);
+}
+
+
+void distributed_test_sbcc_2025(int argc, char *argv[]){
+
+  //boost::mpi::environment env{argc, argv};
+  //boost::mpi::communicator comm;
+  //MPI_Init(&argc,&argv);
+  MPI_Comm comm = MPI_COMM_WORLD;
+int n;//Number nodes
+  int m;//Number of interior nodes
+  int b;//Number of boundary nodes
+  int offset;//n-1
+  int num_eles;
+  int num_faces;
+  int i;//index variable
+  int j;//index variable
+  int k;//index variable
+  Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> Z_original_natural_ordering;
+  Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> Z_original;
+  Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> Z_boundary_transformation;
+  Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> Z_femwarp_transformed;
+  Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic> T;
+  Eigen::Matrix3d transformation; transformation=Eigen::Scaling(2.0,2.0,2.0);  //Eigen::AngleAxisd transformation (DEF_ANGLE,Eigen::Vector3d::UnitZ());
+  Eigen::Matrix<double,3,3> transformation_matrix_transpose;
+
+  int rank;
+  int size;
+  MPI_Comm_rank (MPI_COMM_WORLD, &rank);
+  MPI_Comm_size (MPI_COMM_WORLD, &size);
+
+
+  if(rank==0){
+    cout<<"Start"<<endl;
+    ifstream in_file;
+    stringstream ss;
+    string word;
+    string orig_mesh_name=argv[1];//IN_MESH_NAME;
+    string new_mesh_name=OUT_MESH_NAME;
+    string in_line="#";
+
+
+
+ in_file.open(orig_mesh_name+".bin_meta", ios::binary);
+    int meta[4];
+    in_file.read(reinterpret_cast<char*>(meta), 4*sizeof(int));
+    in_file.close();
+
+    m=meta[0];
+    b=meta[1];
+    n=meta[2];
+    num_eles=meta[3];
+
+    Z_original.resize(3,n);
+    in_file.open(orig_mesh_name+".bin_nodes", ios::binary);
+    in_file.read(reinterpret_cast<char*>(Z_original.data()), n*3*sizeof(double));
+    in_file.close();
+    Z_original.transposeInPlace();
+
+
+
+    T.resize(4,num_eles);
+    in_file.open(orig_mesh_name+".bin_eles", ios::binary);
+    in_file.read(reinterpret_cast<char*>(T.data()), num_eles*4*sizeof(int));
+    in_file.close();
+    //T.transposeInPlace();
+
+    Z_femwarp_transformed.resize(m,3);
+    Z_femwarp_transformed.setZero();
+  }
+
+ MPI_Barrier(MPI_COMM_WORLD);
+
+  MPI_Bcast(&n,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&m,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&b,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&num_eles,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Barrier(MPI_COMM_WORLD);
+
+
+
+int num_deformations=1;
+  void (*deformation_functions[])(Eigen::MatrixXd&) = {
+    parallel_affine_transformation,
+    /*parallel_affine_transformation,
+    parallel_affine_transformation,
+    parallel_affine_transformation,
+    parallel_affine_transformation,
+    parallel_affine_transformation*/
+  };
+  if(rank!=0){
+    Z_original.resize(n,3);
+    //Z_boundary_transformation.resize(b,3);
+    Z_femwarp_transformed.resize(m,3);
+    Z_femwarp_transformed.setZero();
+    //T.resize(num_eles,4);//Comment out if we want to make T a giant window
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+MPI_Bcast(Z_original.data(),n*3,MPI_DOUBLE,0,MPI_COMM_WORLD);
+
+
+double start,end;
+  MPI_Barrier(MPI_COMM_WORLD);
+  start = MPI_Wtime();
+  distributed_multistep_femwarp3d_SHM_RMA(Z_original,deformation_functions,num_deformations,T,n,m,b,num_eles,comm,size,rank,Z_femwarp_transformed); //distributed_femwarp3d_RMA works
+  MPI_Barrier(MPI_COMM_WORLD);
+  end  = MPI_Wtime();
+
+  if(rank==0){
+    //cout<<Z_original<<endl;
+    //cout<<"=========="<<endl;
+    //cout<<Z_femwarp_transformed<<endl;//(0,0)<<" "<<-124.835<<endl;
+    cout<<size<<" time: "<<end-start<<endl;
+    string orig_mesh_name=argv[1];//IN_MESH_NAME;
+    fstream out_file;
+    time_t ctime_cur = time(NULL);
+    struct tm ctime_data = *localtime(&ctime_cur);
+    string str_time(asctime(&ctime_data));
+    str_time.erase(std::remove(str_time.begin(), str_time.end(), '\n'), str_time.end());
+
+    //out_file.open("/kuhpc/work/bigjay/a976h261/tetgen_meshes/"+str_time+" "+orig_mesh_name+".bin_nodes", ios::out | ios::binary);
+    //out_file.write(reinterpret_cast<char *>(Z_original.data()), n*3*sizeof(double));
+    //out_file.close();
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  MPI_Finalize();
+}
+
+
+
 void distributed_test_packed_6(int argc, char *argv[]){
 
-  boost::mpi::environment env{argc, argv};
-  boost::mpi::communicator comm;
-  
+  //boost::mpi::environment env{argc, argv};
+  //boost::mpi::communicator comm;
+  MPI_Init(&argc,&argv);
+  MPI_Comm comm = MPI_COMM_WORLD;
+
   int n;//Number nodes
   int m;//Number of interior nodes
   int b;//Number of boundary nodes
@@ -129,11 +311,11 @@ void distributed_test_packed_6(int argc, char *argv[]){
     string in_line="#";
     bool no_smesh=false;
 
-   
 
 
-    
-    in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_meta", ios::binary);
+
+
+    in_file.open(orig_mesh_name+".bin_meta", ios::binary);
     int meta[4];
     in_file.read(reinterpret_cast<char*>(meta), 4*sizeof(int));
     in_file.close();
@@ -145,28 +327,32 @@ void distributed_test_packed_6(int argc, char *argv[]){
 
 
     Z_original.resize(3,n);
-    in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_nodes", ios::binary);
+    in_file.open(orig_mesh_name+".bin_nodes", ios::binary);
     in_file.read(reinterpret_cast<char*>(Z_original.data()), n*3*sizeof(double));
     in_file.close();
     Z_original.transposeInPlace();
-    
-    
+
+
 
     T.resize(4,num_eles);
-    in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_eles", ios::binary);
+    in_file.open(orig_mesh_name+".bin_eles", ios::binary);
     in_file.read(reinterpret_cast<char*>(T.data()), num_eles*4*sizeof(int));
     in_file.close();
     //T.transposeInPlace();
-    
+
     Z_femwarp_transformed.resize(m,3);
     Z_femwarp_transformed.setZero();
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  broadcast(comm,n,0);
+  /*broadcast(comm,n,0);
   broadcast(comm,m,0);
   broadcast(comm,b,0);
-  broadcast(comm,num_eles,0);
+  broadcast(comm,num_eles,0);*/
+  MPI_Bcast(&n,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&m,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&b,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&num_eles,1,MPI_INT,0,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
   if(rank!=0){
     Z_original.resize(n,3);
@@ -178,8 +364,10 @@ void distributed_test_packed_6(int argc, char *argv[]){
   MPI_Barrier(MPI_COMM_WORLD);
 
 
-  broadcast(comm,Z_original.data(),n*3,0);
-  broadcast(comm,Z_boundary_transformation.data(),b*3,0);
+  //broadcast(comm,Z_original.data(),n*3,0);
+  //broadcast(comm,Z_boundary_transformation.data(),b*3,0);
+  MPI_Bcast(Z_original.data(),n*3,MPI_DOUBLE,0,MPI_COMM_WORLD);
+  MPI_Bcast(Z_boundary_transformation.data(),b*3,MPI_DOUBLE,0,MPI_COMM_WORLD);
   //broadcast(comm,T.data(),num_eles*4,0); //Comment out if we want to make T a giant window
   double start,end;
   MPI_Barrier(MPI_COMM_WORLD);
@@ -187,9 +375,9 @@ void distributed_test_packed_6(int argc, char *argv[]){
   distributed_femwarp3d_SHM_RMA(Z_original,Z_boundary_transformation,T,n,m,b,num_eles,comm,size,rank,Z_femwarp_transformed); //distributed_femwarp3d_RMA works
   MPI_Barrier(MPI_COMM_WORLD);
   end  = MPI_Wtime();
-  
+
   if(rank==0){
-    cout<<Z_femwarp_transformed<<endl;//(0,0)<<" "<<-124.835<<endl; 
+    cout<<Z_femwarp_transformed<<endl;//(0,0)<<" "<<-124.835<<endl;
     cout<<size<<" time: "<<end-start<<endl;
   }
 
@@ -200,9 +388,12 @@ void distributed_test_packed_6(int argc, char *argv[]){
 
 void distributed_test_packed_3(int argc, char *argv[]){
 
-  boost::mpi::environment env{argc, argv};
-  boost::mpi::communicator comm;
-  
+  //boost::mpi::environment env{argc, argv};
+  //boost::mpi::communicator comm;
+  MPI_Init(&argc,&argv);
+  MPI_Comm comm = MPI_COMM_WORLD;
+
+
   int n;//Number nodes
   int m;//Number of interior nodes
   int b;//Number of boundary nodes
@@ -237,7 +428,7 @@ void distributed_test_packed_3(int argc, char *argv[]){
 
 
 
-    
+
     in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_meta", ios::binary);
     int meta[4];
     in_file.read(reinterpret_cast<char*>(meta), 4*sizeof(int));
@@ -254,25 +445,29 @@ void distributed_test_packed_3(int argc, char *argv[]){
     in_file.read(reinterpret_cast<char*>(Z_original.data()), n*3*sizeof(double));
     in_file.close();
     Z_original.transposeInPlace();
-    
-    
+
+
 
     T.resize(4,num_eles);
     in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_eles", ios::binary);
     in_file.read(reinterpret_cast<char*>(T.data()), num_eles*4*sizeof(int));
     in_file.close();
     //T.transposeInPlace();
-    
+
     Z_femwarp_transformed.resize(m,3);
     Z_femwarp_transformed.setZero();
 
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  broadcast(comm,n,0);
+  /*broadcast(comm,n,0);
   broadcast(comm,m,0);
   broadcast(comm,b,0);
-  broadcast(comm,num_eles,0);
+  broadcast(comm,num_eles,0);*/
+  MPI_Bcast(&n,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&m,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&b,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&num_eles,1,MPI_INT,0,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
   if(rank!=0){
     //Z_original.resize(n,3);
@@ -285,7 +480,8 @@ void distributed_test_packed_3(int argc, char *argv[]){
 
 
   //broadcast(comm,Z_original.data(),n*3,0);
-  broadcast(comm,Z_boundary_transformation.data(),b*3,0);
+  //broadcast(comm,Z_boundary_transformation.data(),b*3,0);
+  MPI_Bcast(Z_boundary_transformation.data(),b*3,MPI_DOUBLE,0,MPI_COMM_WORLD);
   //broadcast(comm,T.data(),num_eles*4,0); //Comment out if we want to make T a giant window
   double start,end;
   MPI_Barrier(MPI_COMM_WORLD);
@@ -293,9 +489,9 @@ void distributed_test_packed_3(int argc, char *argv[]){
   distributed_femwarp3d_RMA(Z_original,Z_boundary_transformation,T,n,m,b,num_eles,comm,size,rank,Z_femwarp_transformed); //distributed_femwarp3d_RMA works
   MPI_Barrier(MPI_COMM_WORLD);
   end  = MPI_Wtime();
-  
+
   if(rank==0){
-    cout<<Z_femwarp_transformed<<endl;//(0,0)<<" "<<-124.835<<endl; 
+    cout<<Z_femwarp_transformed<<endl;//(0,0)<<" "<<-124.835<<endl;
     cout<<size<<" time: "<<end-start<<endl;
   }
 
@@ -352,18 +548,18 @@ void serial_test(int argc, char *argv[]){
   in_file.read(reinterpret_cast<char*>(Z_original.data()), n*3*sizeof(double));
   in_file.close();
   Z_original.transposeInPlace();
-  
-  
+
+
 
   T.resize(4,num_eles);
   in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_eles", ios::binary);
   in_file.read(reinterpret_cast<char*>(T.data()), num_eles*4*sizeof(int));
   in_file.close();
   T.transposeInPlace();
-  
+
   Z_femwarp_transformed.resize(m,3);
   Z_femwarp_transformed.setZero();
-    
+
   transformation_matrix_transpose = transformation.transpose();
  //Z_full_transformation=Z_original*transformation_matrix_transpose;
   Z_boundary_transformation=Z_original.block(n-b,0,b,3);//Get only boundary nodes
@@ -373,7 +569,7 @@ void serial_test(int argc, char *argv[]){
   start = MPI_Wtime();
   serial_femwarp3d(Z_original,Z_boundary_transformation,T,n,m,b,num_eles,Z_femwarp_transformed);
   end  = MPI_Wtime();
-  cout<<Z_femwarp_transformed<<endl;//(0,0)<<" "<<-124.835<<endl; 
+  cout<<Z_femwarp_transformed<<endl;//(0,0)<<" "<<-124.835<<endl;
   cout<<1<<" time: "<<end-start<<endl;
 
 
@@ -410,7 +606,7 @@ void serial_multistep_test(int argc, char *argv[]){
   string orig_mesh_name=argv[1];//IN_MESH_NAME;
   string new_mesh_name=OUT_MESH_NAME;
 
-  
+
   in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_meta", ios::binary);
   int meta[4];
   in_file.read(reinterpret_cast<char*>(meta), 4*sizeof(int));
@@ -427,15 +623,15 @@ void serial_multistep_test(int argc, char *argv[]){
   in_file.read(reinterpret_cast<char*>(Z_original.data()), n*3*sizeof(double));
   in_file.close();
   Z_original.transposeInPlace();
-  
-  
+
+
 
   T.resize(4,num_eles);
   in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_eles", ios::binary);
   in_file.read(reinterpret_cast<char*>(T.data()), num_eles*4*sizeof(int));
   in_file.close();
   T.transposeInPlace();
-  
+
   Z_femwarp_transformed.resize(m,3);
   Z_femwarp_transformed.setZero();
 
@@ -455,10 +651,10 @@ void serial_multistep_test(int argc, char *argv[]){
   start = MPI_Wtime();
   serial_multistep_femwarp3d(Z_original,deformation_functions,num_deformations,T,n,m,b,num_eles,Z_femwarp_transformed);
   end  = MPI_Wtime();
-  //cout<<Z_original.block(0,0,m,3)<<endl; 
+  //cout<<Z_original.block(0,0,m,3)<<endl;
   //cout<<"\n\n\n\n\n\n";
 
-  //cout<<Z_femwarp_transformed<<endl; 
+  //cout<<Z_femwarp_transformed<<endl;
 
   fstream out_file;
   time_t ctime_cur = time(NULL);
@@ -473,45 +669,22 @@ void serial_multistep_test(int argc, char *argv[]){
 
 
   //cout<<"\n\n\n\n\n\n";
-  //cout<<Z_original.block(0,0,m,3)-Z_femwarp_transformed<<endl; 
+  //cout<<Z_original.block(0,0,m,3)-Z_femwarp_transformed<<endl;
   cout<<1<<" time: "<<end-start<<endl;
 
 
 
 }
 
-void parallel_affine_transformation(Eigen::MatrixXd& Z_cur_boundary){
-  int rank;
-  int size;
-  MPI_Comm_rank (MPI_COMM_WORLD, &rank);
-  MPI_Comm_size (MPI_COMM_WORLD, &size);
-  int N=static_cast<int>(Z_cur_boundary.rows());
-  int n_parts=N/size;
-  int n_start=rank*n_parts;
-  int n_end=rank==size-1?N:(rank+1)*n_parts;
-  Eigen::Matrix3d transformation; transformation=Eigen::Scaling(2.0,2.0,2.0);  //Eigen::AngleAxisd transformation (DEF_ANGLE,Eigen::Vector3d::UnitZ());
-  Eigen::Matrix<double,3,3> transformation_matrix_transpose;
-  transformation_matrix_transpose = transformation.transpose();
-  if(rank==0){
-    Z_cur_boundary.block(n_end,0,N-(n_end-n_start),3).setZero();
-  }
-  else if(rank==size-1){
-    Z_cur_boundary.block(0,0,N-(n_end-n_start),3).setZero();
-  }
-  else{
-    Z_cur_boundary.block(0,0,n_start,3).setZero();
-    Z_cur_boundary.block(n_end,0,N-n_end,3).setZero();
-  }
-  Z_cur_boundary.block(n_start,0,n_end-n_start,3)*=transformation_matrix_transpose;
-  MPI_Allreduce(MPI_IN_PLACE,Z_cur_boundary.data(),N*3,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-  MPI_Barrier(MPI_COMM_WORLD);
-}
 
 void distributed_multistep_test_packed_6(int argc, char *argv[]){
 
-  boost::mpi::environment env{argc, argv};
-  boost::mpi::communicator comm;
-  
+  //boost::mpi::environment env{argc, argv};
+  //boost::mpi::communicator comm;
+  MPI_Init(&argc,&argv);
+  MPI_Comm comm = MPI_COMM_WORLD;
+
+
   int n;//Number nodes
   int m;//Number of interior nodes
   int b;//Number of boundary nodes
@@ -544,8 +717,8 @@ void distributed_multistep_test_packed_6(int argc, char *argv[]){
     string new_mesh_name=OUT_MESH_NAME;
     string in_line="#";
 
-    
-    
+
+
     in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_meta", ios::binary);
     int meta[4];
     in_file.read(reinterpret_cast<char*>(meta), 4*sizeof(int));
@@ -555,30 +728,34 @@ void distributed_multistep_test_packed_6(int argc, char *argv[]){
     b=meta[1];
     n=meta[2];
     num_eles=meta[3];
-    
+
     Z_original.resize(3,n);
     in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_nodes", ios::binary);
     in_file.read(reinterpret_cast<char*>(Z_original.data()), n*3*sizeof(double));
     in_file.close();
     Z_original.transposeInPlace();
-    
-    
+
+
 
     T.resize(4,num_eles);
     in_file.open("./tetgen_meshes/"+orig_mesh_name+".bin_eles", ios::binary);
     in_file.read(reinterpret_cast<char*>(T.data()), num_eles*4*sizeof(int));
     in_file.close();
     //T.transposeInPlace();
-    
+
     Z_femwarp_transformed.resize(m,3);
     Z_femwarp_transformed.setZero();
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  broadcast(comm,n,0);
+  /*broadcast(comm,n,0);
   broadcast(comm,m,0);
   broadcast(comm,b,0);
-  broadcast(comm,num_eles,0);
+  broadcast(comm,num_eles,0);*/
+  MPI_Bcast(&n,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&m,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&b,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&num_eles,1,MPI_INT,0,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
   int num_deformations=1;
   void (*deformation_functions[])(Eigen::MatrixXd&) = {
@@ -599,9 +776,10 @@ void distributed_multistep_test_packed_6(int argc, char *argv[]){
   MPI_Barrier(MPI_COMM_WORLD);
 
 
-  broadcast(comm,Z_original.data(),n*3,0);
+  //broadcast(comm,Z_original.data(),n*3,0);
+  MPI_Bcast(Z_original.data(),n*3,MPI_DOUBLE,0,MPI_COMM_WORLD);
   //broadcast(comm,Z_boundary_transformation.data(),b*3,0);
-  
+
   //broadcast(comm,T.data(),num_eles*4,0); //Comment out if we want to make T a giant window
   double start,end;
   MPI_Barrier(MPI_COMM_WORLD);
@@ -609,11 +787,11 @@ void distributed_multistep_test_packed_6(int argc, char *argv[]){
   distributed_multistep_femwarp3d_SHM_RMA(Z_original,deformation_functions,num_deformations,T,n,m,b,num_eles,comm,size,rank,Z_femwarp_transformed); //distributed_femwarp3d_RMA works
   MPI_Barrier(MPI_COMM_WORLD);
   end  = MPI_Wtime();
-  
+
   if(rank==0){
     //cout<<Z_original<<endl;
     //cout<<"=========="<<endl;
-    //cout<<Z_femwarp_transformed<<endl;//(0,0)<<" "<<-124.835<<endl; 
+    //cout<<Z_femwarp_transformed<<endl;//(0,0)<<" "<<-124.835<<endl;
     cout<<size<<" time: "<<end-start<<endl;
     string orig_mesh_name=argv[1];//IN_MESH_NAME;
     fstream out_file;
@@ -740,7 +918,7 @@ void serial_multistep_test_crm(int argc, char *argv[]){
   string orig_mesh_name=argv[1];//IN_MESH_NAME;
   string new_mesh_name=OUT_MESH_NAME;
 
-  
+
   in_file.open("/kuhpc/work/bigjay/a976h261/tetgen_meshes/"+orig_mesh_name+".bin_meta", ios::binary);
   int meta[4];
   in_file.read(reinterpret_cast<char*>(meta), 4*sizeof(int));
@@ -766,15 +944,15 @@ void serial_multistep_test_crm(int argc, char *argv[]){
   in_file.read(reinterpret_cast<char*>(Z_original.data()), n*3*sizeof(double));
   in_file.close();
   Z_original.transposeInPlace();
-  
-  
+
+
 
   T.resize(4,num_eles);
   in_file.open("/kuhpc/work/bigjay/a976h261/tetgen_meshes/"+orig_mesh_name+".bin_eles", ios::binary);
   in_file.read(reinterpret_cast<char*>(T.data()), num_eles*4*sizeof(int));
   in_file.close();
   T.transposeInPlace();
-  
+
   Z_femwarp_transformed.resize(m,3);
   Z_femwarp_transformed.setZero();
 
@@ -793,11 +971,11 @@ void serial_multistep_test_crm(int argc, char *argv[]){
   start = MPI_Wtime();
   serial_multistep_femwarp3d(Z_original,deformation_functions,num_deformations,T,n,m,b,num_eles,Z_femwarp_transformed);
   end  = MPI_Wtime();
-  //cout<<Z_original.block(0,0,m,3)<<endl; 
+  //cout<<Z_original.block(0,0,m,3)<<endl;
   //cout<<"\n\n\n\n\n\n";
-  //cout<<Z_femwarp_transformed<<endl; 
+  //cout<<Z_femwarp_transformed<<endl;
   //cout<<"\n\n\n\n\n\n";
-  //cout<<Z_original.block(0,0,m,3)-Z_femwarp_transformed<<endl; 
+  //cout<<Z_original.block(0,0,m,3)-Z_femwarp_transformed<<endl;
 
 
   fstream out_file;
@@ -819,9 +997,9 @@ void serial_multistep_test_crm(int argc, char *argv[]){
 
 void distributed_multistep_test_packed_6_crm(int argc, char *argv[]){
 
-  boost::mpi::environment env{argc, argv};
-  boost::mpi::communicator comm;
-  
+  //boost::mpi::environment env{argc, argv};
+  //boost::mpi::communicator comm;
+  MPI_Init(&argc,&argv);MPI_Comm comm = MPI_COMM_WORLD;
   int n;//Number nodes
   int m;//Number of interior nodes
   int b;//Number of boundary nodes
@@ -854,7 +1032,7 @@ void distributed_multistep_test_packed_6_crm(int argc, char *argv[]){
     string new_mesh_name=OUT_MESH_NAME;
     string in_line="#";
 
-    
+
 
 
 
@@ -879,30 +1057,34 @@ void distributed_multistep_test_packed_6_crm(int argc, char *argv[]){
     in_file.read(reinterpret_cast<char*>(global_bound_ids), n*sizeof(int));
     in_file.close();
 
-    
+
     Z_original.resize(3,n);
     in_file.open("/kuhpc/work/bigjay/a976h261/tetgen_meshes/"+orig_mesh_name+".bin_nodes", ios::binary);
     in_file.read(reinterpret_cast<char*>(Z_original.data()), n*3*sizeof(double));
     in_file.close();
     Z_original.transposeInPlace();
-    
-    
+
+
 
     T.resize(4,num_eles);
     in_file.open("/kuhpc/work/bigjay/a976h261/tetgen_meshes/"+orig_mesh_name+".bin_eles", ios::binary);
     in_file.read(reinterpret_cast<char*>(T.data()), num_eles*4*sizeof(int));
     in_file.close();
     //T.transposeInPlace();
-    
+
     Z_femwarp_transformed.resize(m,3);
     Z_femwarp_transformed.setZero();
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  broadcast(comm,n,0);
+  /*broadcast(comm,n,0);
   broadcast(comm,m,0);
   broadcast(comm,b,0);
-  broadcast(comm,num_eles,0);
+  broadcast(comm,num_eles,0);*/
+  MPI_Bcast(&n,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&m,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&b,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&num_eles,1,MPI_INT,0,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
   int num_deformations=1;
   void (*deformation_functions[])(Eigen::MatrixXd&) = {
@@ -921,7 +1103,7 @@ void distributed_multistep_test_packed_6_crm(int argc, char *argv[]){
     //T.resize(num_eles,4);//Comment out if we want to make T a giant window
 
 
-    
+
     global_bound_ids=(int*)malloc(n*sizeof(int));
     while(global_bound_ids==NULL){
       cout<<"malloc failed on rank "<<rank<<endl;
@@ -933,10 +1115,12 @@ void distributed_multistep_test_packed_6_crm(int argc, char *argv[]){
 
 
   global_m=m;
-  broadcast(comm,global_bound_ids,n,0);
-  broadcast(comm,Z_original.data(),n*3,0);
+  //broadcast(comm,global_bound_ids,n,0);
+  MPI_Bcast(global_bound_ids,n,MPI_INT,0,MPI_COMM_WORLD);
+  //broadcast(comm,Z_original.data(),n*3,0);
+  MPI_Bcast(Z_original.data(),n*3,MPI_DOUBLE,0,MPI_COMM_WORLD);
   //broadcast(comm,Z_boundary_transformation.data(),b*3,0);
-  
+
   //broadcast(comm,T.data(),num_eles*4,0); //Comment out if we want to make T a giant window
   double start,end;
   MPI_Barrier(MPI_COMM_WORLD);
@@ -944,7 +1128,7 @@ void distributed_multistep_test_packed_6_crm(int argc, char *argv[]){
   distributed_multistep_femwarp3d_SHM_RMA(Z_original,deformation_functions,num_deformations,T,n,m,b,num_eles,comm,size,rank,Z_femwarp_transformed); //distributed_femwarp3d_RMA works
   MPI_Barrier(MPI_COMM_WORLD);
   end  = MPI_Wtime();
-  
+
   if(rank==0){
     /*cout<<Z_original<<endl;
     cout<<"=========="<<endl;
@@ -989,7 +1173,8 @@ int main(int argc, char *argv[]){
   if(size>1){
     //distributed_test_packed_6(argc,argv);
     //distributed_multistep_test_packed_6(argc,argv);
-    distributed_multistep_test_packed_6_crm(argc,argv);
+    //distributed_multistep_test_packed_6_crm(argc,argv);
+    distributed_test_sbcc_2025(argc,argv);
   }
   else{
     //serial_test(argc,argv);

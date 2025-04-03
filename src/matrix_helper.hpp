@@ -20,17 +20,17 @@ License Notice:
     along with ParFEMWARP in the file labeled LICENSE.txt.  If not, see https://www.gnu.org/licenses/agpl-3.0.txt
 
 
-Author: 
+Author:
     Abir Haque
 
-Date Last Updated: 
-    March 5th, 2025
+Date Last Updated:
+    April 3rd, 2025
 
-Notes: 
-    This software was developed by Abir Haque in collaboration with Dr. Suzanne M. Shontz at the University of Kansas (KU). 
+Notes:
+    This software was developed by Abir Haque in collaboration with Dr. Suzanne M. Shontz at the University of Kansas (KU).
     This work was supported by the following:
-        HPC facilities operated by the Center for Research Computing at KU supported by NSF Grant OAC-2117449, 
-        REU Supplement to NSF Grant OAC-1808553, 
+        HPC facilities operated by the Center for Research Computing at KU supported by NSF Grant OAC-2117449,
+        REU Supplement to NSF Grant OAC-1808553,
         REU Supplement to NSF Grant CBET-2245153,
         KU School of Engineering Undergraduate Research Fellows Program
     If you wish to use this code in your own work, you must review the license at LICENSE.txt and cite the following paper:
@@ -47,16 +47,16 @@ Notes:
 #include <sstream>
 #include <mpi.h>
 #include <omp.h>
-#include <chrono> 
+#include <chrono>
 #include <unordered_map>
 #include <set>
 #include <vector>
 #include <list>
 #include <queue>
 #include <numeric>
-#include <boost/mpi/collectives/all_gather.hpp>
-#include <boost/mpi/collectives/all_gatherv.hpp>
-#include <boost/mpi.hpp>
+//#include <boost/mpi/collectives/all_gather.hpp>
+//#include <boost/mpi/collectives/all_gatherv.hpp>
+//#include <boost/mpi.hpp>
 #include <Eigen/Eigen>
 #include <Eigen/Core>
 
@@ -65,9 +65,9 @@ using namespace std;
 
 double volume_tetrahedron
 (
-  double a[], 
-  double b[], 
-  double c[], 
+  double a[],
+  double b[],
+  double c[],
   double d[]
 );
 
@@ -82,9 +82,9 @@ Eigen::Matrix4d gen_element_stiffness_matrix_tetrahedron
 
 void gen_basis_function_gradients_tetrahedron
 (
-  double* a, 
-  double* b, 
-  double* c, 
+  double* a,
+  double* b,
+  double* c,
   double* d,
   Eigen::Matrix4d& ret
 );
@@ -101,7 +101,8 @@ void csr_to_dist_csr
   CSR_Matrix& csr_matrix,
   CSR_Matrix& dist_csr_matrix_part,
   int rows,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int size,
   int rank
 );
@@ -111,7 +112,8 @@ void parallel_csr_x_matrix
   CSR_Matrix& csr,
   Eigen::MatrixXd& matrix,
   Eigen::MatrixXd& result,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr
@@ -123,18 +125,20 @@ void parallel_csr_x_matrix_optimized
   Eigen::MatrixXd& matrix,
   Eigen::MatrixXd& result,
   Eigen::MatrixXd& tmp_result,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr
 );
 
-void parallel_block_diag_matrix_x_matrix
+/*void parallel_block_diag_matrix_x_matrix
 (
   Eigen::MatrixXd& local_A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& result,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr,
@@ -146,19 +150,21 @@ void parallel_block_diag_matrices_x_matrix
   vector<Eigen::MatrixXd>& local_A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& result,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr,
   int* starting_indices
-);
+);*/
 
 void parallel_diag_matrix_x_matrix
 (
   CSR_Matrix& csr,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& result,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int rank,
   int size,
   int* num_rows_arr,
@@ -176,7 +182,8 @@ void parallel_ATxA
 (
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& ATxA,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -186,7 +193,8 @@ void parallel_ATxB
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& ATxB,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -198,7 +206,8 @@ void parallel_ATxB_CTxD
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& D,
   Eigen::MatrixXd& ATxB_CTxD,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -208,7 +217,8 @@ void parallel_matrix_multiplication
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& AxB,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -218,7 +228,8 @@ void parallel_matrix_addition
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& A_B,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,
+  //boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -228,7 +239,7 @@ void parallel_matrix_subtraction
   Eigen::MatrixXd& A,
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& A_B,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -239,7 +250,7 @@ void parallel_C_add_AB
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& C_add_AB,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -250,7 +261,7 @@ void parallel_C_sub_AB
   Eigen::MatrixXd& B,
   Eigen::MatrixXd& C,
   Eigen::MatrixXd& C_sub_AB,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -264,7 +275,7 @@ void parallel_C_add_AB_F_sub_DE
   Eigen::MatrixXd& E,
   Eigen::MatrixXd& F,
   Eigen::MatrixXd& C_add_AB_F_sub_DE,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size
 );
@@ -274,7 +285,7 @@ void parallel_sparse_block_conjugate_gradient_v2
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int num_rows
@@ -285,7 +296,7 @@ void parallel_sparse_block_conjugate_gradient_v3
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int num_rows,
@@ -297,7 +308,7 @@ void parallel_sparse_block_conjugate_gradient_v4
   CSR_Matrix& local_A,
   Eigen::MatrixXd& global_b,
   Eigen::MatrixXd& X,
-  boost::mpi::communicator& comm,
+  MPI_Comm comm,//boost::mpi::communicator& comm,
   int rank,
   int size,
   int num_rows,
@@ -357,4 +368,3 @@ void icf
   CSR_Matrix& A,
   CSR_Matrix& M
 );
-
