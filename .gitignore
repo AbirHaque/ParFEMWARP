@@ -1,5 +1,4 @@
-
 lib
-src/tetgen_meshes
+debug
 .vscode
 *.o
