@@ -61,9 +61,9 @@ Notes:
 #include <Eigen/Eigen>
 #include <Eigen/Core>
 #include <Eigen/Sparse>
-#include "./csr.hpp"
-#include "./matrix_helper.hpp"
-#include "./FEMWARP.hpp"
+#include <csr.hpp>
+#include <matrix_helper.hpp>
+#include <FEMWARP.hpp>
 
 
 #define DEF_ANGLE 0.01745

@@ -59,7 +59,7 @@ Notes:
 #include <Eigen/Eigen>
 #include <Eigen/Sparse>
 #include <Eigen/Core>
-#include "./csr.hpp"
+#include <csr.hpp>
 
 
 using namespace std;

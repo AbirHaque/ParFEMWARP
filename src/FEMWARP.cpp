@@ -57,8 +57,8 @@ Notes:
 #include <Eigen/Eigen>
 #include <Eigen/Core>
 #include <Eigen/Sparse>
-#include "./csr.hpp"
-#include "./matrix_helper.hpp"
+#include <csr.hpp>
+#include <matrix_helper.hpp>
 
 #define DEBUG (false)
 #define MAX_TET_NODE_NEIGHBORS (120)

@@ -1,0 +1,1 @@
+ mpirun -n 8 -mca osc pt2pt,sm example.o ./meshes/body_has_heart
