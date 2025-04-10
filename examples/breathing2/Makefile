@@ -1,11 +1,11 @@
 CXX = mpic++
 EIGEN_DIR ?= /usr/include/eigen-3.4.0
-PARFEMWARP_INC_DIR = ../include
-PARFEMWARP_LIB_DIR = ../lib
+PARFEMWARP_INC_DIR = ../../include
+PARFEMWARP_LIB_DIR = ../../lib
 CXXFLAGS = -std=c++11 -I $(EIGEN_DIR) -I $(PARFEMWARP_INC_DIR)
 LIBS = -L$(PARFEMWARP_LIB_DIR) -l_parfemwarp
-TARGET = breathing.o
-SRC = breathing.cpp
+TARGET = breathing2.o
+SRC = breathing2.cpp
 
 all: $(TARGET)
  

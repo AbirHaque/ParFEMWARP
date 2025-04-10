@@ -274,7 +274,7 @@ void distributed_femwarp3d_RMA//works
     }
   }
   //cout<<"List "<<rank<<"\n";
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Lists time: "<<end-start<<"\n";}start = MPI_Wtime();
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Neighbor lists precomputation time: "<<end-start<<"\n";}start = MPI_Wtime();
   MPI_Allreduce(&loc_num_vals_in_AI,&num_vals_in_AI,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
   MPI_Allreduce(&loc_num_vals_in_AB,&num_vals_in_AB,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);//exit(100);
@@ -330,7 +330,7 @@ void distributed_femwarp3d_RMA//works
 
 
   //free(neighbors);
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}start = MPI_Wtime();
+  MPI_Barrier(MPI_COMM_WORLD);/*end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}*/start = MPI_Wtime();
   for (n_ele=low; n_ele<high; n_ele++){
     //cout<<rank<<":"<<low<<" "<<n_ele<<""<<high<<"\n";
     //MPI_Get(&T_ele, 4, MPI_UNSIGNED, 0, n_ele*4, 4, MPI_UNSIGNED, T_win);
@@ -394,7 +394,7 @@ void distributed_femwarp3d_RMA//works
   }
   MPI_Allreduce(tmpI,AI_matrix._vals,AI_matrix._num_vals,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
   MPI_Allreduce(tmpB,AB_matrix._vals,AB_matrix._num_vals,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" FEM time: "<<end-start<<"\n";}start = MPI_Wtime();
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Global stiffness matrix generation time: "<<end-start<<"\n";}start = MPI_Wtime();
 
 
 
@@ -715,7 +715,7 @@ void distributed_femwarp3d_SHM_RMA //works
   }
 
 
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Lists time: "<<end-start<<"\n";}start = MPI_Wtime();
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Neighbor lists precomputation time: "<<end-start<<"\n";}start = MPI_Wtime();
 
 
   int shm_parts=m/shmsize;
@@ -1229,7 +1229,7 @@ void distributed_femwarp3d_SHM_RMA //works
 
 
 
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}start = MPI_Wtime();
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();/*end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}*/start = MPI_Wtime();
   if(num_nodes>1){for(i=0;i<num_nodes;i++){MPI_Win_free(&tmp_neighbors_shared_win[i]);}}
   for(i=0;i<shmsize;i++){MPI_Win_free(&shared_win[i]);}
   MPI_Win_free(&shared_tmpI_c_win);
@@ -1293,7 +1293,7 @@ void distributed_femwarp3d_SHM_RMA //works
   MPI_Allreduce(tmpI,AI_matrix._vals,AI_matrix._num_vals,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Allreduce(tmpB,AB_matrix._vals,AB_matrix._num_vals,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" FEM time: "<<end-start<<"\n";}start = MPI_Wtime();
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Global stiffness matrix generation time: "<<end-start<<"\n";}start = MPI_Wtime();
 
 
 
@@ -1527,6 +1527,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   int rank_to_send_val;
   int local_index;
   int num_out=0;
+  double lists_time=0;
 
   for(i = low; i<high;i++){
     i_low_4x=(i-low)*4;
@@ -1606,8 +1607,9 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   }
 
 
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Lists time: "<<end-start<<"\n";}start = MPI_Wtime();
-
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();/*if(rank==0){cout<<rank<<" Neighbor lists precomputation time: "<<end-start<<"\n";}*/
+  lists_time+=end-start;
+  start = MPI_Wtime();
 
   int shm_parts=m/shmsize;
   int shm_start=shmrank*shm_parts;
@@ -1662,103 +1664,15 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Combine lists 1 time: "<<end-start<<"\n";}start = MPI_Wtime();
-
+  end = MPI_Wtime();/*if(rank==0){cout<<rank<<" Combine lists 1 time: "<<end-start<<"\n";}*/
+  lists_time+=end-start;
+  start = MPI_Wtime();
 
 
 
   ///////////////////Combine across multiple nodes///////////////
   if(num_nodes>1){
-    if(!REDUNDANT){
-      if(!RMA){
 
-        int m_parts=m/size;
-        int m_start=rank*m_parts;
-        int m_end=rank==size-1?m:(rank+1)*m_parts;
-
-        int start_end_nodes[num_nodes+1];
-        int disps[num_nodes];
-        int counts_send[num_nodes];
-        for(i=0;i<num_nodes;i++){
-          start_end_nodes[i]=(i*shmsize)*m_parts;
-          disps[i]=start_end_nodes[i]*MAX_TET_NODE_NEIGHBORS_BUF;
-          if(i>=1){
-            counts_send[i-1]=(start_end_nodes[i]-start_end_nodes[i-1])*MAX_TET_NODE_NEIGHBORS_BUF;
-          }
-        }
-        counts_send[num_nodes-1]=(start_end_nodes[num_nodes]-start_end_nodes[num_nodes-1])*MAX_TET_NODE_NEIGHBORS_BUF;
-        start_end_nodes[num_nodes]=m;
-
-        if(shmrank==0){
-          int tmp_tmp_neighbors[num_nodes][m][MAX_TET_NODE_NEIGHBORS_BUF]={0};
-          MPI_Allgather(shared_neigbors_arr[0],m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,tmp_tmp_neighbors,m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,inter_comm);
-          MPI_Barrier(inter_comm);if(rank==0){cout<<rank<<" MPI_Allgather 1 time: "<<MPI_Wtime()-start<<"\n";}
-          for(i=0;i<num_nodes;i++){
-            memcpy(tmp_neighbors[i]+m_start*MAX_TET_NODE_NEIGHBORS_BUF /*technically start for node*/,tmp_tmp_neighbors[i][m_start/*technically start for node*/],(start_end_nodes[rank/shmsize+1]-m_start)*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int));
-          }
-        }
-
-
-        MPI_Barrier(MPI_COMM_WORLD);if(rank==0){cout<<rank<<" memcpy 1 time: "<<MPI_Wtime()-start<<"\n";}
-
-
-        for(i=m_start;i<m_end;i++){
-          row_size=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0];
-          for(j=0;j<num_nodes;j++){
-            for(k=1;k<=tmp_neighbors[j][i*MAX_TET_NODE_NEIGHBORS_BUF+0];k++){
-              int val_to_find=tmp_neighbors[j][i*MAX_TET_NODE_NEIGHBORS_BUF+k];
-              found=false;
-              l_low=1;
-              l_high=row_size;
-              while(l_low<=l_high){
-                l_mid=l_low+(l_high-l_low)/2;
-                N_val_1=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l_mid];
-                if(N_val_1==val_to_find){
-                  found=true;
-                  break;
-                }
-                else if(N_val_1<val_to_find){
-                  l_low=l_mid+1;
-                }
-                else{
-                  l_high=l_mid-1;
-                }
-              }
-              N_ind=l_low;
-              if(!found){
-                row_size+=1;
-                if(row_size==MAX_TET_NODE_NEIGHBORS_BUF){cout<<"Node "<<i<<" has more than "<<MAX_TET_NODE_NEIGHBORS<<" neighbors! "<<"\n";exit(MAX_TET_NODE_NEIGHBORS_BUF);}
-                else{
-                  //Insert element
-                  shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0]=row_size;
-
-                  for(l=row_size;l>=N_ind;l--){
-                    shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l]=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l-1];
-                  }
-                  shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+N_ind]=val_to_find;
-                }
-              }
-            }
-          }
-          int mid_div = std::lower_bound(&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+1],&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+row_size+1],m)-&shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+1];
-          loc_num_vals_in_AI+=mid_div;
-          loc_num_vals_in_AB+=row_size-mid_div;
-
-        }
-
-        MPI_Barrier(MPI_COMM_WORLD);if(rank==0){cout<<rank<<" Merge time: "<<MPI_Wtime()-start<<"\n";}
-
-        if(shmrank==0){
-          int tmp_tmp_neighbors[num_nodes][m][MAX_TET_NODE_NEIGHBORS_BUF]={0};
-          MPI_Allgather(shared_neigbors_arr[0],m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,tmp_tmp_neighbors,m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,inter_comm);
-          MPI_Barrier(inter_comm);if(rank==0){cout<<rank<<" MPI_Allgather 2 time: "<<MPI_Wtime()-start<<"\n";}
-          for(i=0;i<num_nodes;i++){
-            memcpy(shared_neigbors_arr[0]+start_end_nodes[i]*MAX_TET_NODE_NEIGHBORS_BUF,tmp_tmp_neighbors[i][start_end_nodes[i]],(start_end_nodes[i+1]-start_end_nodes[i])*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int));
-          }
-        }
-        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime();
-      }
-      else{
         int m_parts=m/size;
         int m_start=rank*m_parts;
         int m_end=rank==size-1?m:(rank+1)*m_parts;
@@ -1808,7 +1722,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
 
 
 
-        MPI_Barrier(MPI_COMM_WORLD);if(rank==0){cout<<rank<<" DEBUG RMA memcpy 1 time: "<<MPI_Wtime()-start<<"\n";}
+        MPI_Barrier(MPI_COMM_WORLD);//if(rank==0){cout<<rank<<" DEBUG RMA memcpy 1 time: "<<MPI_Wtime()-start<<"\n";}
 
 
         for(i=m_start;i<m_end;i++){
@@ -1855,7 +1769,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
 
         }
 
-        MPI_Barrier(MPI_COMM_WORLD);if(rank==0){cout<<rank<<" DEBUG Merge time: "<<MPI_Wtime()-start<<"\n";}
+        MPI_Barrier(MPI_COMM_WORLD);//if(rank==0){cout<<rank<<" DEBUG Merge time: "<<MPI_Wtime()-start<<"\n";}
 
         if(shmrank==0){
           MPI_Win_lock_all(0, local_master_neighors_win);
@@ -1868,74 +1782,19 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
 
           MPI_Win_unlock_all(local_master_neighors_win);
 
-          MPI_Barrier(inter_comm);if(rank==0){cout<<rank<<" DEBUG MPI_Allgather 2 time: "<<MPI_Wtime()-start<<"\n";}
+          MPI_Barrier(inter_comm);//if(rank==0){cout<<rank<<" DEBUG MPI_Allgather 2 time: "<<MPI_Wtime()-start<<"\n";}
         }
-        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime();
-      }
-    }
+        MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();/*if(rank==0){cout<<rank<<" NRCombine lists 2 time: "<<end-start<<"\n";}*/
+        lists_time+=end-start;
+        start = MPI_Wtime();
 
-    else{
-      if(shmrank==0){
-        int tmp_tmp_neighbors[num_nodes][m][MAX_TET_NODE_NEIGHBORS_BUF]={0};
-        MPI_Allgather(shared_neigbors_arr[0],m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,tmp_tmp_neighbors,m*MAX_TET_NODE_NEIGHBORS_BUF,MPI_INT,inter_comm);
-        MPI_Barrier(inter_comm);
-        for(i=0;i<num_nodes;i++){
-          memcpy(tmp_neighbors[i],tmp_tmp_neighbors[i],m*MAX_TET_NODE_NEIGHBORS_BUF*sizeof(int));
-        }
-      }
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      int shm_parts=m/shmsize;
-      int shm_start=shmrank*shm_parts;
-      int shm_end=shmrank==shmsize-1?m:(shmrank+1)*shm_parts;
-      for(i=shm_start;i<shm_end;i++){
-        for(j=0;j<num_nodes;j++){
-          for(k=1;k<=tmp_neighbors[j][i*MAX_TET_NODE_NEIGHBORS_BUF+0];k++){
-            row_size=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0];
-            int val_to_find=tmp_neighbors[j][i*MAX_TET_NODE_NEIGHBORS_BUF+k];
-            found=false;
-            l_low=1;
-            l_high=row_size;
-            while(l_low<=l_high){
-              l_mid=l_low+(l_high-l_low)/2;
-              N_val_1=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l_mid];
-              if(N_val_1==val_to_find){
-                found=true;
-                break;
-              }
-              else if(N_val_1<val_to_find){
-                l_low=l_mid+1;
-              }
-              else{
-                l_high=l_mid-1;
-              }
-            }
-            N_ind=l_low;
-            if(!found){
-              row_size+=1;
-              if(row_size==MAX_TET_NODE_NEIGHBORS_BUF){cout<<"Node "<<i<<" has more than "<<MAX_TET_NODE_NEIGHBORS<<" neighbors! "<<"\n";exit(MAX_TET_NODE_NEIGHBORS_BUF);}
-              else{
-                //Insert element
-                shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+0]=row_size;
-
-                for(l=row_size;l>=N_ind;l--){
-                  shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l]=shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+l-1];
-                }
-                shared_neigbors_arr[0][i*MAX_TET_NODE_NEIGHBORS_BUF+N_ind]=val_to_find;
-                if(val_to_find<m && rank<shmsize){
-                  loc_num_vals_in_AI+=1;
-                }
-                else if(val_to_find>=m && rank<shmsize){
-                  loc_num_vals_in_AB+=1;
-                }
-              }
-            }
-          }
-        }
-      }
-      MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" RCombine lists 2 time: "<<end-start<<"\n";}start = MPI_Wtime();
-    }
+      
+    
   }
+
+  if(rank==0){cout<<rank<<" Neighbor lists precomputation time: "<<end-start<<"\n";}
+
+
 
   ///////////////////Combine across multiple nodes///////////////
 
@@ -2055,7 +1914,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
 
 
 
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}start = MPI_Wtime();
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();/*end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}*/start = MPI_Wtime();
   if(num_nodes>1){for(i=0;i<num_nodes;i++){MPI_Win_free(&tmp_neighbors_shared_win[i]);}}
   for(i=0;i<shmsize;i++){MPI_Win_free(&shared_win[i]);}
   MPI_Win_free(&shared_tmpI_c_win);
@@ -2119,7 +1978,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   MPI_Allreduce(tmpI,AI_matrix._vals,AI_matrix._num_vals,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Allreduce(tmpB,AB_matrix._vals,AB_matrix._num_vals,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" FEM time: "<<end-start<<"\n";}start = MPI_Wtime();
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Global stiffness matrix generation time: "<<end-start<<"\n";}start = MPI_Wtime();
 
 
 
@@ -2135,23 +1994,29 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   MPI_Barrier(MPI_COMM_WORLD);
   num_rows = accumulate(num_rows_arr, num_rows_arr+size, num_rows);
 
+  double bound_def_time=0;
+  double linear_solve_time=0;
   for(i=0;i<num_deformations;i++){
     A_B_hat.resize(3,AI_matrix._num_row_ptrs-1);//Should be (num_rows,3), but mpi gets mad
     A_B_hat.setZero();
     Z_femwarp_transformed.setZero();
     MPI_Barrier(MPI_COMM_WORLD);start = MPI_Wtime();
     (*deformation_functions[i])(Z_cur_boundary);
+    MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<"\t"<<rank<<" Boundary deformation #"<<i<<" time: "<<end-start<<"\n";}
+    bound_def_time+=end-start;
+    start = MPI_Wtime();
     parallel_csr_x_matrix(local_A_B,Z_cur_boundary,A_B_hat,comm,rank,size,num_rows_arr);
-    MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Times Matrix time: "<<end-start<<"\n";}start = MPI_Wtime();
     int block_size=1;
     block_size=local_num_rows<block_size?local_num_rows:block_size;
     parallel_sparse_block_conjugate_gradient_v3(local_A_I,A_B_hat,Z_femwarp_transformed,comm,rank,size,num_rows,block_size);
+    end = MPI_Wtime();if(rank==0){cout<<"\t"<<rank<<" Linear solution #"<<i<<" time: "<<end-start<<"\n";}
+    linear_solve_time+=end-start;
   }
+  if(rank==0){cout<<rank<<" Total boundary deformations time: "<<bound_def_time<<"\n";}
+  if(rank==0){cout<<rank<<" Total linear solutions time: "<<linear_solve_time<<"\n";}
 
 
-
-
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" CG time: "<<end-start<<"\n";}
+  //MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" CG time: "<<end-start<<"\n";}
 
   if(rank==0){
     Z_original.block(0,0,m,3)=Z_femwarp_transformed.eval();
@@ -2186,6 +2051,7 @@ void serial_femwarp3d
   double b_func[3];
   double c_func[3];
   double d_func[3];
+  double lists_time;
 
   Eigen::Matrix4d basis_function_gradients;
   Eigen::Matrix4d element_stiffness_matrix;
@@ -2308,7 +2174,8 @@ void serial_femwarp3d
 
 
 
-  end = MPI_Wtime();if(rank==0){cout<<rank<<" Lists time: "<<end-start<<"\n";}start = MPI_Wtime();
+  end = MPI_Wtime();if(rank==0){cout<<rank<<" Neighbor lists precomputation time: "<<end-start<<"\n";}start = MPI_Wtime();
+  
 
   CSR_Matrix AI_matrix(num_vals_in_AI,num_vals_in_AI,m+1);
   CSR_Matrix AB_matrix(num_vals_in_AB,num_vals_in_AB,m+1);
@@ -2343,7 +2210,7 @@ void serial_femwarp3d
   AB_matrix.setRowPtrsAt(m,AB_col_indices_pos);
 
 
-  end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}start = MPI_Wtime();
+  end = MPI_Wtime();/*if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}*/start = MPI_Wtime();
 
 
 
@@ -2390,7 +2257,7 @@ void serial_femwarp3d
       }
     }
   }
-  end = MPI_Wtime();if(rank==0){cout<<rank<<" FEM time: "<<end-start<<"\n";}
+  end = MPI_Wtime();if(rank==0){cout<<rank<<" Global stiffness matrix generation time: "<<end-start<<"\n";}
 
   Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> A_B_hat;
 
@@ -2556,7 +2423,7 @@ void serial_multistep_femwarp3d
 
 
 
-  end = MPI_Wtime();if(rank==0){cout<<rank<<" Lists time: "<<end-start<<"\n";}start = MPI_Wtime();
+  end = MPI_Wtime();if(rank==0){cout<<rank<<" Neighbor lists precomputation time: "<<end-start<<"\n";}start = MPI_Wtime();
 
   CSR_Matrix AI_matrix(num_vals_in_AI,num_vals_in_AI,m+1);
   CSR_Matrix AB_matrix(num_vals_in_AB,num_vals_in_AB,m+1);
@@ -2590,7 +2457,7 @@ void serial_multistep_femwarp3d
   AB_matrix.setRowPtrsAt(m,AB_col_indices_pos);
 
 
-  end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}start = MPI_Wtime();
+  end = MPI_Wtime();/*if(rank==0){cout<<rank<<" CSR Matrix Allocation time: "<<end-start<<"\n";}*/start = MPI_Wtime();
 
   for (n_ele=0; n_ele<num_eles; n_ele++){
     T_ele[0]=T(n_ele,0);
@@ -2632,21 +2499,28 @@ void serial_multistep_femwarp3d
       }
     }
   }
-  end = MPI_Wtime();if(rank==0){cout<<rank<<" FEM time: "<<end-start<<"\n";}
+  end = MPI_Wtime();if(rank==0){cout<<rank<<" Global stiffness matrix generation time: "<<end-start<<"\n";}
   Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> A_B_hat;
 
+  double bound_def_time=0;
+  double linear_solve_time=0;
   for(i=0;i<num_deformations;i++){
     A_B_hat.resize(3,AI_matrix._num_row_ptrs-1);//Should be (num_rows,3), but mpi gets mad
     A_B_hat.setZero();
     Z_femwarp_transformed.setZero();
     start = MPI_Wtime();
     (*deformation_functions[i])(Z_cur_boundary);
-    end = MPI_Wtime();if(rank==0){cout<<rank<<" Deformation time: "<<end-start<<"\n";}start = MPI_Wtime();
+    end = MPI_Wtime();if(rank==0){cout<<"\t"<<rank<<" Boundary deformation #"<<i<<" time: "<<end-start<<"\n";}
+    bound_def_time+=end-start;
+    start = MPI_Wtime();
     csr_x_matrix(AB_matrix,Z_cur_boundary,A_B_hat);
-    end = MPI_Wtime();if(rank==0){cout<<rank<<" CSR Times Matrix time: "<<end-start<<"\n";}start = MPI_Wtime();
     sparse_block_conjugate_gradient_v3(AI_matrix,A_B_hat,Z_femwarp_transformed);
-    end = MPI_Wtime();if(rank==0){cout<<rank<<" CG time: "<<end-start<<"\n";}
+    end = MPI_Wtime();if(rank==0){cout<<"\t"<<rank<<" Linear solution #"<<i<<" time: "<<end-start<<"\n";}
+    linear_solve_time+=end-start;
   }
+  if(rank==0){cout<<rank<<" Total boundary deformations time: "<<bound_def_time<<"\n";}
+  if(rank==0){cout<<rank<<" Total linear solutions time: "<<linear_solve_time<<"\n";}
+
   Z_original.block(0,0,m,3)=Z_femwarp_transformed.eval();
   Z_original.block(m,0,b,3)=Z_cur_boundary.eval();
 }

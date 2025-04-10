@@ -811,7 +811,7 @@ double end;
   int i = 0;
   double cur_err = Rnew.norm();
   while (cur_err>=threshold){
-    start = MPI_Wtime();
+    //start = MPI_Wtime();
     AP.resize(3,num_rows_dist);//Should be (num_rows_dist,3), but mpi gets mad
     AP.setZero();
     parallel_ATxB(R,Z,Rold,comm,rank,size);
@@ -832,10 +832,10 @@ double end;
     parallel_matrix_addition(Z,P_beta,P,comm,rank,size);
     cur_err = Rnew.norm();
     i++;
-    end = MPI_Wtime();if(rank==0)cout<<"\t\tIteration "<<i<<" time: "<<end-start<<"\n";
-    if(rank==0)cout<<"\t\tIteration error: "<<cur_err<<"|"<<threshold<<"\n";
+    //end = MPI_Wtime();if(rank==0)cout<<"\t\tIteration "<<i<<" time: "<<end-start<<"\n";
+    //if(rank==0)cout<<"\t\tIteration error: "<<cur_err<<"|"<<threshold<<"\n";
   }
-  if(rank==0)cout<<"\tIterations: "<<i<<endl;
+  //if(rank==0)cout<<"\tIterations: "<<i<<endl;
 }
 
 void parallel_sparse_block_conjugate_gradient_v4//preconditioning
@@ -968,7 +968,7 @@ void sparse_block_conjugate_gradient_v2
   double end;
 
   while (cur_err>=threshold){
-    start = MPI_Wtime();
+    //start = MPI_Wtime();
     AP.resize(3,A._num_row_ptrs-1);
     AP.setZero();
     csr_x_matrix(A,P,AP);
@@ -986,10 +986,10 @@ void sparse_block_conjugate_gradient_v2
     P=R+P_beta;
     cur_err = Rnew.trace();
     i++;
-    end = MPI_Wtime();cout<<"\t\tIteration "<<i<<" time: "<<end-start<<endl;
-    cout<<"\t\tIteration error: "<<cur_err<<"|"<<threshold<<endl;
+    //end = MPI_Wtime();cout<<"\t\tIteration "<<i<<" time: "<<end-start<<endl;
+    //cout<<"\t\tIteration error: "<<cur_err<<"|"<<threshold<<endl;
   }
-  cout<<"\tIterations: "<<i<<endl;
+  //cout<<"\tIterations: "<<i<<endl;
 }
 
 void sparse_block_conjugate_gradient_v3//preconditioning jacobi
@@ -1026,7 +1026,7 @@ void sparse_block_conjugate_gradient_v3//preconditioning jacobi
 
 
   while (cur_err>=threshold){
-    start = MPI_Wtime();
+    //start = MPI_Wtime();
     AP.resize(3,A._num_row_ptrs-1);
     AP.setZero();
     csr_x_matrix(A,P,AP);
@@ -1045,10 +1045,10 @@ void sparse_block_conjugate_gradient_v3//preconditioning jacobi
     P=Z+P_beta;
     cur_err = Rnew.norm();
     i++;
-    end = MPI_Wtime();cout<<"\t\tIteration "<<i<<" time: "<<end-start<<endl;
-    cout<<"\t\tIteration error: "<<cur_err<<"|"<<threshold<<endl;
+    //end = MPI_Wtime();cout<<"\t\tIteration "<<i<<" time: "<<end-start<<endl;
+    //cout<<"\t\tIteration error: "<<cur_err<<"|"<<threshold<<endl;
   }
-  cout<<"\tIterations: "<<i<<endl;
+  //cout<<"\tIterations: "<<i<<endl;
 }
 
 void icf_forward_solve

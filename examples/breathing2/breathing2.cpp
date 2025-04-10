@@ -124,6 +124,21 @@ void parallel_contract(Eigen::MatrixXd& Z_cur_boundary){
 }
 
 
+void serial_expand(Eigen::MatrixXd& Z_cur_boundary){
+  Eigen::Matrix3d transformation; transformation=Eigen::Scaling(1.01,1.01,1.01); 
+  Eigen::Matrix<double,3,3> transformation_matrix_transpose;
+  transformation_matrix_transpose = transformation.transpose();
+  Z_cur_boundary*=transformation_matrix_transpose;
+}
+
+void serial_contract(Eigen::MatrixXd& Z_cur_boundary){
+  Eigen::Matrix3d transformation; transformation=Eigen::Scaling(1/1.01,1/1.01,1/1.01); 
+  Eigen::Matrix<double,3,3> transformation_matrix_transpose;
+  transformation_matrix_transpose = transformation.transpose();
+  Z_cur_boundary*=transformation_matrix_transpose;
+}
+
+
 void distributed_breathing(int argc, char *argv[]){
 
   //MPI_Init(&argc,&argv);
@@ -157,8 +172,7 @@ int n;//Number nodes
     ifstream in_file;
     stringstream ss;
     string word;
-    string orig_mesh_name=argv[1];//IN_MESH_NAME;
-    string new_mesh_name=OUT_MESH_NAME;
+    string orig_mesh_name=argv[1];
     string in_line="#";
 
 
@@ -202,7 +216,7 @@ int n;//Number nodes
   MPI_Barrier(MPI_COMM_WORLD);
 
 
-int num_cycles=6;
+int num_cycles=60;
 int num_steps_per_cycle=8;
 int num_deformations=num_cycles*num_steps_per_cycle;
 
@@ -234,19 +248,110 @@ double start,end;
   end  = MPI_Wtime();
 
   if(rank==0){
-    cout<<size<<" time: "<<end-start<<endl;
-    string orig_mesh_name=argv[1];
-    fstream out_file;
-    time_t ctime_cur = time(NULL);
-    struct tm ctime_data = *localtime(&ctime_cur);
-    string str_time(asctime(&ctime_data));
-    str_time.erase(std::remove(str_time.begin(), str_time.end(), '\n'), str_time.end());
-
+    cout<<size<<" Ranks overall time: "<<end-start<<endl;
+    double residual=(Z_original_const-Z_original).norm();
+    cout<<"||A-A'||_2: "<<residual<<endl;
+    if(residual<10E-5){
+      cout<<"||A-A'||_2 < 10^-5: Test passed"<<endl;
+    }
+    else{
+      cout<<"||A-A'||_2 >= 10^-5: Test failed"<<endl;
+    }
   }
 
 
   MPI_Finalize();
 }
+
+
+
+
+void serial_breathing(int argc, char *argv[]){
+  int n;//Number nodes
+  int m;//Number of interior nodes
+  int b;//Number of boundary nodes
+  int offset;//n-1
+  int num_eles;
+  int num_faces;
+  int i;//index variable
+  int j;//index variable
+  int k;//index variable
+  Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> Z_original;
+  Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> Z_original_const;
+  Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> Z_boundary_transformation;
+  Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> Z_femwarp_transformed;
+  Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic> T;
+  Eigen::Matrix3d transformation; transformation=Eigen::Scaling(2.0,2.0,2.0);
+  Eigen::Matrix<double,3,3> transformation_matrix_transpose;
+
+
+  ifstream in_file;
+  string orig_mesh_name=argv[1];
+
+
+  in_file.open(orig_mesh_name+".bin_meta", ios::binary);
+  int meta[4];
+  in_file.read(reinterpret_cast<char*>(meta), 4*sizeof(int));
+  in_file.close();
+
+  m=meta[0];
+  b=meta[1];
+  n=meta[2];
+  num_eles=meta[3];
+
+
+  Z_original.resize(3,n);
+  in_file.open(orig_mesh_name+".bin_nodes", ios::binary);
+  in_file.read(reinterpret_cast<char*>(Z_original.data()), n*3*sizeof(double));
+  in_file.close();
+  Z_original.transposeInPlace();
+  Z_original_const.resize(n,3);
+  Z_original_const=Z_original.eval();
+
+
+
+  T.resize(4,num_eles);
+  in_file.open(orig_mesh_name+".bin_eles", ios::binary);
+  in_file.read(reinterpret_cast<char*>(T.data()), num_eles*4*sizeof(int));
+  in_file.close();
+  T.transposeInPlace();
+
+  Z_femwarp_transformed.resize(m,3);
+  Z_femwarp_transformed.setZero();
+
+
+  int num_cycles=2;
+  int num_steps_per_cycle=8;
+  int num_deformations=num_cycles*num_steps_per_cycle;
+
+  void (*deformation_functions[num_deformations])(Eigen::MatrixXd&);
+  for(i=0;i<num_cycles;i++){
+    for(j=0;j<num_steps_per_cycle;j++){
+      if(i%2==0){
+        deformation_functions[i*num_steps_per_cycle+j]=parallel_expand;
+      }
+      else{
+        deformation_functions[i*num_steps_per_cycle+j]=parallel_contract;
+      }
+    }
+  }
+
+  double start,end;
+  start = MPI_Wtime();
+  serial_multistep_femwarp3d(Z_original,deformation_functions,num_deformations,T,n,m,b,num_eles,Z_femwarp_transformed);
+  end  = MPI_Wtime();
+  cout<<1<<" Ranks overall time: "<<end-start<<endl;
+  double residual=(Z_original_const-Z_original).norm();
+  cout<<"||A-A'||_2: "<<residual<<endl;
+  if(residual<10E-5){
+    cout<<"||A-A'||_2 < 10^-5: Test passed"<<endl;
+  }
+  else{
+    cout<<"||A-A'||_2 >= 10^-5: Test failed"<<endl;
+  }
+}
+
+    
 
 int main(int argc, char *argv[]){
   MPI_Init(NULL,NULL);
@@ -256,7 +361,7 @@ int main(int argc, char *argv[]){
     distributed_breathing(argc,argv);
   }
   else{
+    serial_breathing(argc,argv);
     MPI_Finalize();
-    cout<<"Need at least two processes."<<endl;
   }
 }
