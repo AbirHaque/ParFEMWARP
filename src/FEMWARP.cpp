@@ -1234,7 +1234,7 @@ void distributed_femwarp3d_SHM_RMA //works
   for(i=0;i<shmsize;i++){MPI_Win_free(&shared_win[i]);}
   MPI_Win_free(&shared_tmpI_c_win);
   MPI_Win_free(&shared_tmpB_c_win);
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" MPI_Win_free time: "<<end-start<<"\n";}start = MPI_Wtime();
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();/*if(rank==0){cout<<rank<<" MPI_Win_free time: "<<end-start<<"\n";}*/start = MPI_Wtime();
 
 
   for (n_ele=low; n_ele<high; n_ele++){
@@ -1811,8 +1811,8 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   MPI_Allreduce(&loc_num_vals_in_AI,&num_vals_in_AI,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
   MPI_Allreduce(&loc_num_vals_in_AB,&num_vals_in_AB,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
-  if(rank==0) cout<<"num_vals_in_AI: "<<num_vals_in_AI<<"\n";
-  if(rank==0) cout<<"num_vals_in_AB: "<<num_vals_in_AB<<"\n";
+  //if(rank==0) cout<<"num_vals_in_AI: "<<num_vals_in_AI<<"\n";
+  //if(rank==0) cout<<"num_vals_in_AB: "<<num_vals_in_AB<<"\n";
 
   //cout<<"MPI_Allreduce "<<rank<<"\n";
   CSR_Matrix AI_matrix(num_vals_in_AI,num_vals_in_AI,m+1);
@@ -1919,7 +1919,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   for(i=0;i<shmsize;i++){MPI_Win_free(&shared_win[i]);}
   MPI_Win_free(&shared_tmpI_c_win);
   MPI_Win_free(&shared_tmpB_c_win);
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" MPI_Win_free time: "<<end-start<<"\n";}start = MPI_Wtime();
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();/*if(rank==0){cout<<rank<<" MPI_Win_free time: "<<end-start<<"\n";}*/start = MPI_Wtime();
 
 
   for (n_ele=low; n_ele<high; n_ele++){
@@ -1987,7 +1987,7 @@ void distributed_multistep_femwarp3d_SHM_RMA //works
   CSR_Matrix local_A_B(0,0,0);
   csr_to_dist_csr(AI_matrix,local_A_I,m,comm,size,rank);
   csr_to_dist_csr(AB_matrix,local_A_B,m,comm,size,rank);
-  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();if(rank==0){cout<<rank<<" Distribute Matrix time: "<<end-start<<"\n";}
+  MPI_Barrier(MPI_COMM_WORLD);end = MPI_Wtime();//if(rank==0){cout<<rank<<" Distribute Matrix time: "<<end-start<<"\n";}
   Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> A_B_hat;
   int local_num_rows=local_A_B._num_row_ptrs-1;
   MPI_Allgather(&local_num_rows,1,MPI_INT,num_rows_arr,1,MPI_INT,comm);
