@@ -1,5 +1,5 @@
 # Change EIGEN_DIR to location of eigen
-EIGEN_DIR = /usr/include/eigen3/
+EIGEN_DIR ?= /usr/include/eigen-3.4.0
 
 
 
